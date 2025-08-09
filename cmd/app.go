@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"marketflow/internal/config"
-	"marketflow/internal/logger"
+	"marketflow/internal/infra"
 )
 
 func RunApp() {
-	logger.SetLogger()
+	infra.SetLogger()
 
 	config := config.NewConfig()
 }
