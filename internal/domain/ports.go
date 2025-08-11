@@ -5,9 +5,8 @@ import (
 	"time"
 )
 
-// интерфейсы (ports): ExchangeClient, Cache, Repository, Aggregator, ModeController
 
-type ExhangeClient interface {
+type ExchangeClient interface {
 	// Starts ticker reading. Should be able to auto-reconnect inside itself
 	Start(ctx context.Context) (<-chan PriceTick, <-chan error)
 	Name() Exchange
@@ -44,8 +43,7 @@ type Aggregator interface {
 	Aggregate(prices []float64, ex Exchange, sym Symbol, ts time.Time) MinuteAgg
 }
 
-// UseCases for API
-
+// UseCases for APIs
 type MarketService interface {
 	// Latest
 	GetLatestPrice(ctx context.Context, sym Symbol, ex *Exchange) (float64, error)
