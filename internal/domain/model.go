@@ -2,8 +2,6 @@ package domain
 
 import "time"
 
-// сущности: PriceTick, Aggregated, Pair, Exchange, etc.
-
 type (
 	Symbol   string // "BTCUSDT",
 	Exchange string // "ex1", "ex2", "ex3", "test-1", ...
