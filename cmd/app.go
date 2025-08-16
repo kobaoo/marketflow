@@ -10,7 +10,7 @@ import (
 func RunApp() {
 	infra.SetUpLogger()
 
-	exchange.RunTCPClient()
+	exchange.RunTCPClients()
 
 	// cfg, err := config.Load("./configs/config.json")
 	// if err != nil {
