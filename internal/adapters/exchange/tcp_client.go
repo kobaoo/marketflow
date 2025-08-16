@@ -11,15 +11,24 @@ import (
 	"syscall"
 )
 
-func RunTCPClients() {
+// TODO: implement auto reconnecting to server if connections are lost
+
+func RunTCPClients(testMode bool) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	allMessages := make(chan []byte, 30)
 
+	if testMode {
+		genMessages := make(chan []byte, 30)
+		go StartGenerator(ctx, genMessages)
+		go StartGenerator(ctx, genMessages)
+		go StartGenerator(ctx, genMessages)
 
-	runTCPClient(ctx, "127.0.0.1:40101", 1, allMessages)
-	runTCPClient(ctx, "127.0.0.1:40102", 2, allMessages)
-	runTCPClient(ctx, "127.0.0.1:40103", 3, allMessages)
+	} else {
+		runTCPClient(ctx, "127.0.0.1:40101", 1, allMessages)
+		runTCPClient(ctx, "127.0.0.1:40102", 2, allMessages)
+		runTCPClient(ctx, "127.0.0.1:40103", 3, allMessages)
+	}
 }
 
 func runTCPClient(ctx context.Context, address string, exchangeId int, allMessages chan<- []byte) {
@@ -39,7 +48,7 @@ func runTCPClient(ctx context.Context, address string, exchangeId int, allMessag
 	// Start workers
 	for i := 1; i <= 5; i++ {
 		wg.Add(1)
-		go worker(ctx, i, exchangeId, messages, &wg)
+		go worker(ctx, i, exchangeId, messages, allMessages, &wg)
 	}
 
 	// TCP reader goroutine with drop-on-overflow
@@ -74,7 +83,7 @@ func runTCPClient(ctx context.Context, address string, exchangeId int, allMessag
 	wg.Wait()
 }
 
-func worker(ctx context.Context, id, exchangeId int, jobs <-chan []byte, wg *sync.WaitGroup) {
+func worker(ctx context.Context, id, exchangeId int, jobs <-chan []byte, allMessages chan<- []byte, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		select {
@@ -85,8 +94,12 @@ func worker(ctx context.Context, id, exchangeId int, jobs <-chan []byte, wg *syn
 			if !ok {
 				return
 			}
-			slog.Debug("Worker processing message", "exchange", exchangeId, "id", id, "message", string(msg))
+			select {
+			case allMessages <- msg:
+				slog.Debug("Worker processing message", "exchange", exchangeId, "id", id, "message", string(msg))
+			default:
+				slog.Debug("Worker dropping message", "exchange", exchangeId, "id", id, "message", string(msg))
+			}
 		}
 	}
 }
-
