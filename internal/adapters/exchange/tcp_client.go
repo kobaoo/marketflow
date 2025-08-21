@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"log/slog"
+	"marketflow/internal/adapters/cache"
 	"marketflow/internal/config"
 	"net"
 	"os"
@@ -14,7 +15,7 @@ import (
 
 // TODO: implement auto reconnecting to server if connections are lost
 
-func RunTCPClients(testMode bool, config *config.Config) {
+func RunTCPClients(config *config.Config, rdb *cache.RedisClient, testMode bool) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	allMessages := make(chan []byte, 30)

@@ -2,15 +2,15 @@ package postgres
 
 import (
 	"database/sql"
-	"fmt"
 	"log/slog"
+	"marketflow/internal/config"
 
 	_ "github.com/lib/pq"
 )
 
-func ConnectDB() {
+func ConnectDB(config config.Config) {
 	// Define connection string
-	connStr := "postgres://user:password@localhost:5432/mydb?sslmode=disable"
+	connStr := config.Postgres.Dsn
 
 	// Open connection
 	db, err := sql.Open("postgres", connStr)
@@ -25,5 +25,5 @@ func ConnectDB() {
 		slog.Error("Error pinging database", "error", err)
 	}
 
-	fmt.Println("Connected to Postgres ✅")
+	slog.Info("Connected to Postgres ✅")
 }

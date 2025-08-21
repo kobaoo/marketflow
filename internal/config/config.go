@@ -6,14 +6,26 @@ import (
 )
 
 type Config struct {
-	Port      int        `json:"port"`
-	Mode      string     `json:"mode"`
-	Exchanges []Exchange `json:"exchanges"`
+	Port      int            `json:"port"`
+	Mode      string         `json:"mode"`
+	Exchanges []Exchange     `json:"exchanges"`
+	Redis     RedisConfig    `json:"redis"`
+	Postgres  PostgresConfig `json:"postgres"`
 }
 
 type Exchange struct {
 	Name string `json:"name"`
 	Addr string `json:"addr"`
+}
+
+type RedisConfig struct {
+	Addr     string `json:"addr"`
+	Password string `json:"password"`
+	DB       int    `json:"db"`
+}
+
+type PostgresConfig struct {
+	Dsn string `json:"dsn"`
 }
 
 func loadConfig(path string) (Config, error) {

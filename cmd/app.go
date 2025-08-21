@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"log/slog"
+	"marketflow/internal/adapters/cache"
 	"marketflow/internal/adapters/exchange"
 	"marketflow/internal/config"
 	"marketflow/internal/infra"
@@ -15,5 +16,10 @@ func RunApp() {
 		slog.Error("Config Error", "error", err)
 	}
 
-	exchange.RunTCPClients(false)
+	rdb, err := cache.NewRedisClient(&config) // Connect to Redis
+	if err != nil {
+		slog.Error("Redis Error", "error", err)
+	}
+
+	exchange.RunTCPClients(&config, rdb, false)
 }
