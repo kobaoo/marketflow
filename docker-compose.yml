@@ -13,10 +13,17 @@ services:
       - DB_PASS=secret
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - EXCHANGE1_HOST=exchange1  # ← используем имена сервисов
+      - EXCHANGE2_HOST=exchange2
+      - EXCHANGE3_HOST=exchange3
     depends_on:
       - db
       - redis
-    restart: unless-stopped
+      - exchange1
+      - exchange2
+      - exchange3
+    networks:
+      - marketflow-network
 
   db:
     image: postgres:16
@@ -26,10 +33,11 @@ services:
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: mydb
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
-    restart: unless-stopped
+    networks:
+      - marketflow-network
 
   redis:
     image: redis:7-alpine
@@ -38,7 +46,33 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    restart: unless-stopped
+    networks:
+      - marketflow-network
+
+  exchange1:
+    image: exchange1:latest
+    ports:
+      - "40101:40101"
+    networks:
+      - marketflow-network
+
+  exchange2:
+    image: exchange2:latest
+    ports:
+      - "40102:40102"
+    networks:
+      - marketflow-network
+
+  exchange3:
+    image: exchange3:latest
+    ports:
+      - "40103:40103"
+    networks:
+      - marketflow-network
+
+networks:
+  marketflow-network:
+    driver: bridge
 
 volumes:
   db_data:
