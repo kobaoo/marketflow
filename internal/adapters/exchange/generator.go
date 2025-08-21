@@ -9,9 +9,9 @@ import (
 )
 
 type Message struct {
-    Symbol    string  `json:"symbol"`
-    Price     float64 `json:"price"`
-    Timestamp int64   `json:"timestamp"`
+	Symbol    string  `json:"symbol"`
+	Price     float64 `json:"price"`
+	Timestamp int64   `json:"timestamp"`
 }
 
 var symbols []string = []string{

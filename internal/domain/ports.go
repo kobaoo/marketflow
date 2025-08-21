@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 type ExchangeClient interface {
 	// Starts ticker reading. Should be able to auto-reconnect inside itself
 	Start(ctx context.Context) (<-chan PriceTick, <-chan error)

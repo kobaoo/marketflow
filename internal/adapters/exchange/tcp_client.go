@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"log/slog"
+	"marketflow/internal/config"
 	"net"
 	"os"
 	"os/signal"
@@ -13,7 +14,7 @@ import (
 
 // TODO: implement auto reconnecting to server if connections are lost
 
-func RunTCPClients(testMode bool) {
+func RunTCPClients(testMode bool, config *config.Config) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	allMessages := make(chan []byte, 30)

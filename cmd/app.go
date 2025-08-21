@@ -1,20 +1,19 @@
 package cmd
 
 import (
-	// "log/slog"
-	// "marketflow/internal/config"
+	"log/slog"
 	"marketflow/internal/adapters/exchange"
+	"marketflow/internal/config"
 	"marketflow/internal/infra"
 )
 
 func RunApp() {
 	infra.SetUpLogger()
 
-	exchange.RunTCPClients(false)
+	config, err := config.ReadConfig() // Read config
+	if err != nil {
+		slog.Error("Config Error", "error", err)
+	}
 
-	// cfg, err := config.Load("./configs/config.json")
-	// if err != nil {
-	// 	slog.Error("Config Error", "error", err)
-	// }
-	
+	exchange.RunTCPClients(false)
 }
