@@ -1,21 +1,14 @@
 {
-    "http": { "port": 8080 },
-    "mode": "live",
-    "pairs": ["BTCUSDT","DOGEUSDT","TONUSDT","SOLUSDT","ETHUSDT"],
-    "exchanges": [
-      {"name":"ex1","addr":"127.0.0.1:40101"},
-      {"name":"ex2","addr":"127.0.0.1:40102"},
-      {"name":"ex3","addr":"127.0.0.1:40103"}
-    ],
-    "workers_per_exchange": 5,
-    "redis": { "addr":"127.0.0.1:6379", "password":"", "db":0 },
-    "postgres": {
-      "dsn":"postgres://user:pass@127.0.0.1:5432/marketflow?sslmode=disable"
-    },
-    "aggregation": {
-      "window_seconds": 60,
-      "flush_every_seconds": 60
-    },
-    "log": { "level":"info" }
+  "port": "8080",
+  "mode": "live",
+  "exchanges": [
+    {"name":"ex1","addr":"127.0.0.1:40101"},
+    {"name":"ex2","addr":"127.0.0.1:40102"},
+    {"name":"ex3","addr":"127.0.0.1:40103"}
+  ],
+  "redis": { "addr":"127.0.0.1:6379", "password":"", "db":0 },
+  "postgres": {
+    "dsn":"postgres://user:pass@127.0.0.1:5432/marketflow?sslmode=disable"
   }
+}
   

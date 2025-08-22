@@ -5,58 +5,78 @@ import (
 	"time"
 )
 
-
 type ExchangeClient interface {
-	// Starts ticker reading. Should be able to auto-reconnect inside itself
-	Start(ctx context.Context) (<-chan PriceTick, <-chan error)
-	Name() Exchange
+	StartLiveMode(ctx context.Context) <-chan PriceTick
+	StartTestMode(ctx context.Context) <-chan PriceTick
+	Stop()
 }
 
-type Cache interface {
-	SetLatest(ctx context.Context, ex Exchange, sym Symbol, price float64, ttlSec int) error
-	GetLatest(ctx context.Context, ex *Exchange, sym Symbol) (float64, bool, error) // ex=nil -> по всем
+type RedisClient interface {
+	StoreTick(ctx context.Context, exchange, pair string, price float64)
+	ProcessLastMinute(ctx context.Context) []*MinuteAgg
 
-	// Window 60с: adding and reading of range; also period clean
-	AppendToWindow(ctx context.Context, ex Exchange, sym Symbol, tick PriceTick) error
-	ReadWindow(ctx context.Context, ex Exchange, sym Symbol, since time.Time) ([]float64, error)
-	TrimOld(ctx context.Context, olderThan time.Time) error
+	GetLatestPriceByPattern(ctx context.Context, pattern string) float64
 
-	// for /highest|/lowest|/average?period=...
-	ReadWindowPeriod(ctx context.Context, ex *Exchange, sym Symbol, since time.Time) ([]float64, error)
+	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 }
 
 type Repository interface {
-	InitSchema(ctx context.Context) error
-	InsertMinuteAggBatch(ctx context.Context, rows []MinuteAgg) error
-	// Fallback for API, if Redis unavailable
-	LastAgg(ctx context.Context, ex *Exchange, sym Symbol, limit int) ([]MinuteAgg, error)
+	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg)
+
+	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+
+	GetLowestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+
+	GetAvgPriceBySymbol(ctx context.Context, symbol string) float64
+	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 }
 
-type ModeController interface {
-	SwitchToLive(ctx context.Context) error
-	SwitchToTest(ctx context.Context) error
-	CurrentMode() string
+type DataProcessingService interface {
+	StartWorkers(ctx context.Context, in <-chan PriceTick)
+	StopWorkers()
 }
 
-type Aggregator interface {
-	// Calculates avg/min/max by array of prices
-	Aggregate(prices []float64, ex Exchange, sym Symbol, ts time.Time) MinuteAgg
+type MarketDataService interface {
+	GetLatestPriceBySymbol()
+	GetLatestPriceBySymbolAndExchange()
+
+	GetHighestPriceBySymbol()
+	GetHighestPriceBySymbolAndExchange()
+	GetHighestPriceBySymbolAndPeriod()
+	GetHighestPriceBySymbolAndPeriodAndExchange()
+
+	GetLowestPriceBySymbol()
+	GetLowestPriceBySymbolAndExchange()
+	GetLowestPriceBySymbolAndPeriod()
+	GetLowestPriceBySymbolAndPeriodAndExchange()
+
+	GetAvgPriceBySymbol()
+	GetAvgPriceBySymbolAndExchange()
+	GetAvgPriceBySymbolAndPeriod()
+	GetAvgPriceBySymbolAndPeriodAndExchange()
 }
 
-// UseCases for APIs
-type MarketService interface {
-	// Latest
-	GetLatestPrice(ctx context.Context, sym Symbol, ex *Exchange) (float64, error)
-	// Highest/Lowest/Average за период
-	GetHighest(ctx context.Context, sym Symbol, ex *Exchange, period time.Duration) (float64, error)
-	GetLowest(ctx context.Context, sym Symbol, ex *Exchange, period time.Duration) (float64, error)
-	GetAverage(ctx context.Context, sym Symbol, ex *Exchange, period time.Duration) (float64, error)
+type SystemService interface {
+	SwitchToLiveMode()
+	SwitchToTestMode()
 
-	// Mode
-	SetModeLive(ctx context.Context) error
-	SetModeTest(ctx context.Context) error
-	GetMode() string
-
-	// Health
-	GetHealth(ctx context.Context) (HealthStatus, error)
+	GetHealth()
 }
