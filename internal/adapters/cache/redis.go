@@ -98,6 +98,7 @@ func (r *RedisClient) GetLatestPriceBySymbol(ctx context.Context, symbol string)
 		Max:   "+inf",
 	}).Result()
 	if len(val) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	price, _ := strconv.ParseFloat(val[0], 64)
@@ -111,6 +112,7 @@ func (r *RedisClient) GetLatestPriceBySymbolAndExchange(ctx context.Context, sym
 		Max:   "+inf",
 	}).Result()
 	if len(val) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	price, _ := strconv.ParseFloat(val[0], 64)
@@ -125,6 +127,7 @@ func (r *RedisClient) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symb
 		Max: fmt.Sprint(now),
 	}).Result()
 	if len(vals) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	max, _ := strconv.ParseFloat(vals[0], 64)
@@ -145,6 +148,7 @@ func (r *RedisClient) GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Co
 		Max: fmt.Sprint(now),
 	}).Result()
 	if len(vals) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	max, _ := strconv.ParseFloat(vals[0], 64)
@@ -165,6 +169,7 @@ func (r *RedisClient) GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbo
 		Max: fmt.Sprint(now),
 	}).Result()
 	if len(vals) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	min, _ := strconv.ParseFloat(vals[0], 64)
@@ -185,6 +190,7 @@ func (r *RedisClient) GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Con
 		Max: fmt.Sprint(now),
 	}).Result()
 	if len(vals) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	min, _ := strconv.ParseFloat(vals[0], 64)
@@ -205,6 +211,7 @@ func (r *RedisClient) GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol s
 		Max: fmt.Sprint(now),
 	}).Result()
 	if len(vals) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	var sum float64
@@ -224,6 +231,7 @@ func (r *RedisClient) GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Contex
 		Max: fmt.Sprint(now),
 	}).Result()
 	if len(vals) == 0 {
+		slog.Error("Error geting data from Redis")
 		return 0
 	}
 	var sum float64

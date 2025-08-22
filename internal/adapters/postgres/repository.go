@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"marketflow/internal/domain"
 	"time"
 
@@ -23,7 +24,7 @@ func (r *Repository) StoreMinAgg(ctx context.Context, agg *domain.MinuteAgg) {
 		VALUES ($1, $2, $3, $4, $5, $6)
 		`, agg.Exchange, agg.Symbol, agg.Ts, agg.Avg, agg.Min, agg.Max)
 	if err != nil {
-		panic(err)
+		slog.Error("Error storing data", "err", err)
 	}
 }
 
@@ -36,6 +37,7 @@ func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string)
 		GROUP BY pair_name
 		`, symbol).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -50,6 +52,7 @@ func (r *Repository) GetHighestPriceBySymbolAndExchange(ctx context.Context, sym
 		GROUP BY pair_name, exchange
 		`, symbol, exchange).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -65,6 +68,7 @@ func (r *Repository) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbo
 		GROUP BY pair_name
 		`, symbol, now-int64(period.Seconds())).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -80,6 +84,7 @@ func (r *Repository) GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Con
 		GROUP BY pair_name, exchange
 		`, symbol, exchange, now-int64(period.Seconds())).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -94,6 +99,7 @@ func (r *Repository) GetLowestPriceBySymbol(ctx context.Context, symbol string) 
 		GROUP BY pair_name
 		`, symbol).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -108,6 +114,7 @@ func (r *Repository) GetLowestPriceBySymbolAndExchange(ctx context.Context, symb
 		GROUP BY pair_name, exchange
 		`, symbol, exchange).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -123,6 +130,7 @@ func (r *Repository) GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol
 		GROUP BY pair_name
 		`, symbol, now-int64(period.Seconds())).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -138,6 +146,7 @@ func (r *Repository) GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Cont
 		GROUP BY pair_name, exchange
 		`, symbol, exchange, now-int64(period.Seconds())).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -152,6 +161,7 @@ func (r *Repository) GetAvgPriceBySymbol(ctx context.Context, symbol string) flo
 		GROUP BY pair_name
 		`, symbol).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -166,6 +176,7 @@ func (r *Repository) GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol,
 		GROUP BY pair_name, exchange
 		`, symbol, exchange).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -181,6 +192,7 @@ func (r *Repository) GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol st
 		GROUP BY pair_name
 		`, symbol, now-int64(period.Seconds())).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
@@ -196,6 +208,7 @@ func (r *Repository) GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context
 		GROUP BY pair_name, exchange
 		`, symbol, exchange, now-int64(period.Seconds())).Scan(&price)
 	if err != nil {
+		slog.Error("Repository error", "err", err)
 		return 0
 	}
 	return price
