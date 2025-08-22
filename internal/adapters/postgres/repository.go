@@ -3,8 +3,10 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"marketflow/internal/domain"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -18,11 +20,38 @@ func NewRepository(db *sql.DB) domain.Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) StoreMinAgg(ctx context.Context, agg *domain.MinuteAgg) {
-	_, err := r.db.ExecContext(ctx, `
+func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) {
+	if len(aggs) == 0 {
+		return
+	}
+
+	query := `
 		INSERT INTO minute_prices (exchange, pair_name, timestamp, average_price, min_price, max_price)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		`, agg.Exchange, agg.Symbol, agg.Ts, agg.Avg, agg.Min, agg.Max)
+		VALUES %s
+	`
+
+	// Build placeholders dynamically: ($1,$2,$3,$4,$5,$6), ($7,$8,$9,$10,$11,$12), ...
+	valueStrings := make([]string, 0, len(aggs))
+	valueArgs := make([]interface{}, 0, len(aggs)*6)
+
+	for i, agg := range aggs {
+		start := i*6 + 1
+		valueStrings = append(valueStrings,
+			fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d)", start, start+1, start+2, start+3, start+4, start+5),
+		)
+
+		valueArgs = append(valueArgs,
+			agg.Exchange,
+			agg.Symbol,
+			agg.Ts,
+			agg.Avg,
+			agg.Min,
+			agg.Max,
+		)
+	}
+
+	stmt := fmt.Sprintf(query, strings.Join(valueStrings, ","))
+	_, err := r.db.ExecContext(ctx, stmt, valueArgs...)
 	if err != nil {
 		slog.Error("Error storing data", "err", err)
 	}

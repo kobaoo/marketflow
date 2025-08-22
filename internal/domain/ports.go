@@ -13,7 +13,9 @@ type ExchangeClient interface {
 
 type RedisClient interface {
 	StoreTick(ctx context.Context, exchange, pair string, price float64)
-	ProcessLastMinute(ctx context.Context, exchange, pair string) *MinuteAgg
+	ProcessLastMinute(ctx context.Context) []*MinuteAgg
+
+	GetLatestPriceByPattern(ctx context.Context, pattern string) float64
 
 	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
 	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
@@ -29,7 +31,7 @@ type RedisClient interface {
 }
 
 type Repository interface {
-	StoreMinAgg(ctx context.Context, agg *MinuteAgg)
+	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg)
 
 	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
 	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64

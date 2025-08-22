@@ -6,7 +6,7 @@ import (
 	"marketflow/internal/config"
 )
 
-func ConnectDB(config config.Config) {
+func ConnectDB(config *config.Config) (*sql.DB) {
 	// Define connection string
 	connStr := config.Postgres.Dsn
 
@@ -24,4 +24,5 @@ func ConnectDB(config config.Config) {
 	}
 
 	slog.Info("Connected to Postgres ✅")
+	return db
 }

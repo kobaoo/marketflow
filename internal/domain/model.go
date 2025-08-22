@@ -3,7 +3,7 @@ package domain
 import "time"
 
 type PriceTick struct {
-	Exhange string
+	Exchange string
 	Symbol  string
 	Price   float64
 	Ts      time.Time
