@@ -49,7 +49,7 @@ func (r *RedisClient) StoreTick(ctx context.Context, exchange, pair string, pric
 	r.rdb.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprint(now-60))
 }
 
-func (r *RedisClient) processLastMinute(ctx context.Context, pair, exchange string) {
+func (r *RedisClient) ProcessLastMinute(ctx context.Context, pair, exchange string) *domain.MinuteAgg {
 	key := fmt.Sprintf("%s:%s:prices", pair, exchange)
 	now := time.Now().Unix()
 
@@ -60,8 +60,8 @@ func (r *RedisClient) processLastMinute(ctx context.Context, pair, exchange stri
 	}).Result()
 
 	if len(vals) == 0 {
-		fmt.Println("No data for", pair)
-		return
+		slog.Error("No data for", "pair", pair)
+		return nil
 	}
 
 	// Compute avg, min, max
@@ -79,15 +79,14 @@ func (r *RedisClient) processLastMinute(ctx context.Context, pair, exchange stri
 
 	avg := sum / float64(len(vals))
 	summary := domain.MinuteAgg{
-		Symbol:   pair,
 		Exchange: exchange,
+		Symbol:   pair,
 		Ts:       time.Now().Truncate(time.Minute),
 		Avg:      avg,
 		Min:      min,
 		Max:      max,
 	}
 
-	// Store into Postgres (pseudo-code)
-	fmt.Printf("Saving summary: %+v\n", summary)
-	// db.Exec("INSERT INTO prices_summary ...", ...)
+	slog.Debug("Counting average for minute", "exchange", exchange, "pair", pair, "avg", avg, "min", min, "max", max)
+	return &summary
 }
