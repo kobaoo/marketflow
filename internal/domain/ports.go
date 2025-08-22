@@ -55,23 +55,23 @@ type DataProcessingService interface {
 }
 
 type MarketDataService interface {
-	GetLatestPriceBySymbol()
-	GetLatestPriceBySymbolAndExchange()
+	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLatestPriceBySymbolAndExchange() float64
 
-	GetHighestPriceBySymbol()
-	GetHighestPriceBySymbolAndExchange()
-	GetHighestPriceBySymbolAndPeriod()
-	GetHighestPriceBySymbolAndPeriodAndExchange()
+	GetHighestPriceBySymbol() float64
+	GetHighestPriceBySymbolAndExchange() float64
+	GetHighestPriceBySymbolAndPeriod() float64
+	GetHighestPriceBySymbolAndPeriodAndExchange() float64
 
-	GetLowestPriceBySymbol()
-	GetLowestPriceBySymbolAndExchange()
-	GetLowestPriceBySymbolAndPeriod()
-	GetLowestPriceBySymbolAndPeriodAndExchange()
+	GetLowestPriceBySymbol() float64
+	GetLowestPriceBySymbolAndExchange() float64
+	GetLowestPriceBySymbolAndPeriod() float64
+	GetLowestPriceBySymbolAndPeriodAndExchange() float64
 
-	GetAvgPriceBySymbol()
-	GetAvgPriceBySymbolAndExchange()
-	GetAvgPriceBySymbolAndPeriod()
-	GetAvgPriceBySymbolAndPeriodAndExchange()
+	GetAvgPriceBySymbol() float64
+	GetAvgPriceBySymbolAndExchange() float64
+	GetAvgPriceBySymbolAndPeriod() float64
+	GetAvgPriceBySymbolAndPeriodAndExchange() float64
 }
 
 type SystemService interface {

@@ -2,7 +2,9 @@ package web
 
 import "net/http"
 
-func getLatestPrice(w http.ResponseWriter, r *http.Request)             {}
+func getLatestPrice(w http.ResponseWriter, r *http.Request)             {
+	
+}
 func getLatestPriceFromExchange(w http.ResponseWriter, r *http.Request) {}
 
 func getHighestPrice(w http.ResponseWriter, r *http.Request)                       {}
