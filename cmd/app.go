@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"marketflow/internal/adapters/cache"
 	"marketflow/internal/adapters/exchange"
+	"marketflow/internal/adapters/web"
 	"marketflow/internal/config"
 	"marketflow/internal/infra"
 )
@@ -22,4 +23,9 @@ func RunApp() {
 	}
 
 	exchange.RunTCPClients(&config, rdb, false)
+
+	err = web.StartServer(config)
+	if err != nil {
+		slog.Error("Error starting server", "error", err)
+	}
 }

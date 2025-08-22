@@ -5,8 +5,9 @@ import (
 )
 
 type ExchangeClient interface {
-	StartTCPClients(ctx context.Context) <-chan PriceTick
-	ChangeMode(ctx context.Context) <-chan PriceTick
+	StartLiveMode(ctx context.Context) <-chan PriceTick
+	StartTestMode(ctx context.Context) <-chan PriceTick
+	Stop()
 }
 
 type RedisClient interface {
