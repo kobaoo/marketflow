@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 )
 
 type ExchangeClient interface {
@@ -12,38 +13,43 @@ type ExchangeClient interface {
 
 type RedisClient interface {
 	StoreTick(ctx context.Context, exchange, pair string, price float64)
-	ProcessLastMinute(ctx context.Context, pair, exchange string) *MinuteAgg
+	ProcessLastMinute(ctx context.Context, exchange, pair string) *MinuteAgg
 
-	GetLatestPriceBySymbol()
-	GetLatestPriceBySymbolAndExchange()
+	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
 
-	GetHighestPriceBySymbolAndPeriod()
-	GetHighestPriceBySymbolAndPeriodAndExchange()
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 
-	GetLowestPriceBySymbolAndPeriod()
-	GetLowestPriceBySymbolAndPeriodAndExchange()
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 
-	GetAvgPriceBySymbolAndPeriod()
-	GetAvgPriceBySymbolAndPeriodAndExchange()
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 }
 
-type Repository interface {
-	StoreMinTick(ctx context.Context, tick *MinuteAgg)
+type RepositoryClient interface {
+	StoreMinAgg(ctx context.Context, agg *MinuteAgg)
 
-	GetHighestPriceBySymbol()
-	GetHighestPriceBySymbolAndExchange()
-	GetHighestPriceBySymbolAndPeriod()
-	GetHighestPriceBySymbolAndPeriodAndExchange()
+	GetHighestPriceBySymbol(ctx context.Context, symbol string)
+	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string)
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration)
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration)
 
-	GetLowestPriceBySymbol()
-	GetLowestPriceBySymbolAndExchange()
-	GetLowestPriceBySymbolAndPeriod()
-	GetLowestPriceBySymbolAndPeriodAndExchange()
+	GetLowestPriceBySymbol(ctx context.Context, symbol string)
+	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string)
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration)
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration)
 
-	GetAvgPriceBySymbol()
-	GetAvgPriceBySymbolAndExchange()
-	GetAvgPriceBySymbolAndPeriod()
-	GetAvgPriceBySymbolAndPeriodAndExchange()
+	GetAvgPriceBySymbol(ctx context.Context, symbol string)
+	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string)
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration)
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration)
+}
+
+type DataProcessingService interface {
+	StartWorkers(ctx context.Context, in <-chan PriceTick)
+	StopWorkers()
 }
 
 type MarketDataService interface {
@@ -66,7 +72,7 @@ type MarketDataService interface {
 	GetAvgPriceBySymbolAndPeriodAndExchange()
 }
 
-type SystemService interface{
+type SystemService interface {
 	SwitchToLiveMode()
 	SwitchToTestMode()
 

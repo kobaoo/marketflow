@@ -16,7 +16,7 @@ type RedisClient struct {
 	rdb *redis.Client
 }
 
-func NewRedisClient(config *config.Config) (*RedisClient, error) {
+func NewRedisClient(config *config.Config) (domain.RedisClient, error) {
 	ctx := context.Background()
 
 	// Create client
@@ -89,4 +89,148 @@ func (r *RedisClient) ProcessLastMinute(ctx context.Context, pair, exchange stri
 
 	slog.Debug("Counting average for minute", "exchange", exchange, "pair", pair, "avg", avg, "min", min, "max", max)
 	return &summary
+}
+
+func (r *RedisClient) GetLatestPriceBySymbol(ctx context.Context, symbol string) float64 {
+	key := fmt.Sprintf("%s:prices", symbol)
+	val, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Count: 1,
+		Max:   "+inf",
+	}).Result()
+	if len(val) == 0 {
+		return 0
+	}
+	price, _ := strconv.ParseFloat(val[0], 64)
+	return price
+}
+
+func (r *RedisClient) GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64 {
+	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+	val, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Count: 1,
+		Max:   "+inf",
+	}).Result()
+	if len(val) == 0 {
+		return 0
+	}
+	price, _ := strconv.ParseFloat(val[0], 64)
+	return price
+}
+
+func (r *RedisClient) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
+	key := fmt.Sprintf("%s:prices", symbol)
+	now := time.Now().Unix()
+	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprint(now - int64(period.Seconds())),
+		Max: fmt.Sprint(now),
+	}).Result()
+	if len(vals) == 0 {
+		return 0
+	}
+	max, _ := strconv.ParseFloat(vals[0], 64)
+	for _, v := range vals[1:] {
+		price, _ := strconv.ParseFloat(v, 64)
+		if price > max {
+			max = price
+		}
+	}
+	return max
+}
+
+func (r *RedisClient) GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
+	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+	now := time.Now().Unix()
+	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprint(now - int64(period.Seconds())),
+		Max: fmt.Sprint(now),
+	}).Result()
+	if len(vals) == 0 {
+		return 0
+	}
+	max, _ := strconv.ParseFloat(vals[0], 64)
+	for _, v := range vals[1:] {
+		price, _ := strconv.ParseFloat(v, 64)
+		if price > max {
+			max = price
+		}
+	}
+	return max
+}
+
+func (r *RedisClient) GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
+	key := fmt.Sprintf("%s:prices", symbol)
+	now := time.Now().Unix()
+	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprint(now - int64(period.Seconds())),
+		Max: fmt.Sprint(now),
+	}).Result()
+	if len(vals) == 0 {
+		return 0
+	}
+	min, _ := strconv.ParseFloat(vals[0], 64)
+	for _, v := range vals[1:] {
+		price, _ := strconv.ParseFloat(v, 64)
+		if price < min {
+			min = price
+		}
+	}
+	return min
+}
+
+func (r *RedisClient) GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
+	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+	now := time.Now().Unix()
+	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprint(now - int64(period.Seconds())),
+		Max: fmt.Sprint(now),
+	}).Result()
+	if len(vals) == 0 {
+		return 0
+	}
+	min, _ := strconv.ParseFloat(vals[0], 64)
+	for _, v := range vals[1:] {
+		price, _ := strconv.ParseFloat(v, 64)
+		if price < min {
+			min = price
+		}
+	}
+	return min
+}
+
+func (r *RedisClient) GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
+	key := fmt.Sprintf("%s:prices", symbol)
+	now := time.Now().Unix()
+	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprint(now - int64(period.Seconds())),
+		Max: fmt.Sprint(now),
+	}).Result()
+	if len(vals) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range vals {
+		price, _ := strconv.ParseFloat(v, 64)
+		sum += price
+	}
+	avg := sum / float64(len(vals))
+	return avg
+}
+
+func (r *RedisClient) GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
+	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+	now := time.Now().Unix()
+	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprint(now - int64(period.Seconds())),
+		Max: fmt.Sprint(now),
+	}).Result()
+	if len(vals) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range vals {
+		price, _ := strconv.ParseFloat(v, 64)
+		sum += price
+	}
+	avg := sum / float64(len(vals))
+	return avg
 }

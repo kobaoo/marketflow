@@ -22,9 +22,9 @@ func RunApp() {
 		slog.Error("Redis Error", "error", err)
 	}
 
-	exchange.RunTCPClients(&config, rdb, false)
+	// exchange.RunTCPClients(&config, rdb, false)
 
-	err = web.StartServer(config)
+	err = web.StartServer(&config)
 	if err != nil {
 		slog.Error("Error starting server", "error", err)
 	}

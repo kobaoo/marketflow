@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func StartServer(config config.Config) error {
+func StartServer(config *config.Config) error {
 	mux := http.NewServeMux()
 	RegisterRouter(mux)
 	
