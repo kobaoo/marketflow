@@ -9,14 +9,14 @@ import (
 )
 
 type DataProcessingService struct {
-	redisClient      domain.RedisClient
-	repository domain.Repository
+	redisClient domain.RedisClient
+	repository  domain.Repository
 }
 
-func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository) *DataProcessingService {
+func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository) domain.DataProcessingService {
 	return &DataProcessingService{
-		redisClient:      redisClient,
-		repository: repository,
+		redisClient: redisClient,
+		repository:  repository,
 	}
 }
 
@@ -32,6 +32,9 @@ func (r *DataProcessingService) StartWorkers(ctx context.Context, in <-chan doma
 	<-ctx.Done()
 	slog.Info("Shutting down...")
 	wg.Wait()
+}
+func (r *DataProcessingService) StopWorkers(stop context.CancelFunc) {
+	stop()
 }
 
 func (r *DataProcessingService) worker(ctx context.Context, in <-chan domain.PriceTick, wg *sync.WaitGroup) {

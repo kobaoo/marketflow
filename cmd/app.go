@@ -4,8 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"marketflow/internal/adapters/cache"
+	"marketflow/internal/adapters/exchange"
 	"marketflow/internal/adapters/postgres"
 	"marketflow/internal/adapters/web"
+	"marketflow/internal/app"
 	"marketflow/internal/config"
 	"marketflow/internal/infra"
 	"os"
@@ -32,9 +34,16 @@ func RunApp() {
 	db := postgres.ConnectDB(&config)
 	repository := postgres.NewRepository(db)
 
-	// exchange.RunTCPClients(&config, rdb, false)
-
-	
+	exchangeClient := exchange.NewExchangeClient(&config)
+	if config.Mode == "live" {
+		messages := exchangeClient.StartLiveMode(ctx)
+		dataProcessingService := app.NewDataProcessingService(rdb, repository)
+		dataProcessingService.StartWorkers(ctx, messages)
+	} else {
+		messages := exchangeClient.StartTestMode(ctx)
+		dataProcessingService := app.NewDataProcessingService(rdb, repository)
+		dataProcessingService.StartWorkers(ctx, messages)
+	}
 
 	err = web.StartServer(&config)
 	if err != nil {

@@ -3,37 +3,47 @@ package exchange
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"log/slog"
-	"marketflow/internal/adapters/cache"
 	"marketflow/internal/config"
+	"marketflow/internal/domain"
 	"net"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
+	"strconv"
 )
 
-// TODO: implement auto reconnecting to server if connections are lost
-
-func RunTCPClients(config *config.Config, rdb *cache.RedisClient, testMode bool) {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	allMessages := make(chan []byte, 30)
-
-	if testMode {
-		genMessages := make(chan []byte, 30)
-		go StartGenerator(ctx, genMessages)
-		go StartGenerator(ctx, genMessages)
-		go StartGenerator(ctx, genMessages)
-
-	} else {
-		runTCPClient(ctx, "127.0.0.1:40101", 1, allMessages)
-		runTCPClient(ctx, "127.0.0.1:40102", 2, allMessages)
-		runTCPClient(ctx, "127.0.0.1:40103", 3, allMessages)
-	}
+type ExchangeClient struct {
+	config *config.Config
 }
 
-func runTCPClient(ctx context.Context, address string, exchangeId int, allMessages chan<- []byte) {
+func NewExchangeClient(config *config.Config) domain.ExchangeClient {
+	return &ExchangeClient{config: config}
+}
+
+func (r ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
+	messages := make(chan domain.PriceTick, 30)
+
+	r.runTCPClient(ctx, "127.0.0.1:40101", 1, messages)
+	r.runTCPClient(ctx, "127.0.0.1:40102", 2, messages)
+	r.runTCPClient(ctx, "127.0.0.1:40103", 3, messages)
+
+	return messages
+}
+
+func (r ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
+	messages := make(chan domain.PriceTick, 30)
+
+	r.startGenerator(ctx, "exchange1", messages)
+	r.startGenerator(ctx, "exchange2", messages)
+	r.startGenerator(ctx, "exchange3", messages)
+
+	return messages
+}
+
+func (r ExchangeClient) Stop(stop context.CancelFunc) {
+	stop()
+}
+
+func (r ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeId int, out chan<- domain.PriceTick) {
 	// Connect to TCP server
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
@@ -42,35 +52,31 @@ func runTCPClient(ctx context.Context, address string, exchangeId int, allMessag
 	}
 	defer conn.Close()
 
-	// Channel with small buffer to avoid lag
-	messages := make(chan []byte, 10)
-
-	var wg sync.WaitGroup
-
-	// Start workers
-	for i := 1; i <= 5; i++ {
-		wg.Add(1)
-		go worker(ctx, i, exchangeId, messages, allMessages, &wg)
-	}
-
 	// TCP reader goroutine with drop-on-overflow
 	go func() {
 		reader := bufio.NewReader(conn)
 		for {
 			select {
 			case <-ctx.Done():
-				close(messages)
+				close(out)
 				return
 			default:
 				line, err := reader.ReadBytes('\n')
 				if err != nil {
 					slog.Error("Read error:", "err", err)
-					close(messages)
+					close(out)
 					return
 				}
+
+				tick := domain.PriceTick{Exchange: "exchange" + strconv.Itoa(exchangeId)}
+				err = json.Unmarshal(line, &tick)
+				if err != nil {
+					slog.Error("Error unmarshaling message")
+				}
+
 				// Try to send, drop if channel is full
 				select {
-				case messages <- line:
+				case out <- tick:
 					// sent successfully
 				default:
 					slog.Debug("⚠ Dropping stale message")
@@ -81,27 +87,5 @@ func runTCPClient(ctx context.Context, address string, exchangeId int, allMessag
 
 	// Wait for shutdown
 	<-ctx.Done()
-	slog.Info("Shutting down...")
-	wg.Wait()
-}
-
-func worker(ctx context.Context, id, exchangeId int, jobs <-chan []byte, allMessages chan<- []byte, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("Worker stopping", "exchange", exchangeId, "id", id)
-			return
-		case msg, ok := <-jobs:
-			if !ok {
-				return
-			}
-			select {
-			case allMessages <- msg:
-				slog.Debug("Worker processing message", "exchange", exchangeId, "id", id, "message", string(msg))
-			default:
-				slog.Debug("Worker dropping message", "exchange", exchangeId, "id", id, "message", string(msg))
-			}
-		}
-	}
+	slog.Info("Shutting down tcp client")
 }

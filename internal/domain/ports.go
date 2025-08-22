@@ -8,7 +8,7 @@ import (
 type ExchangeClient interface {
 	StartLiveMode(ctx context.Context) <-chan PriceTick
 	StartTestMode(ctx context.Context) <-chan PriceTick
-	Stop()
+	Stop(stop context.CancelFunc)
 }
 
 type RedisClient interface {
@@ -51,7 +51,7 @@ type Repository interface {
 
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
-	StopWorkers()
+	StopWorkers(stop context.CancelFunc)
 }
 
 type MarketDataService interface {
