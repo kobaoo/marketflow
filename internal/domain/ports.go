@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-type ExchangeClient interface {
-	StartLiveMode(ctx context.Context) <-chan PriceTick
-	StartTestMode(ctx context.Context) <-chan PriceTick
+type ExchangeStream interface {
+	Start(ctx context.Context)
+	GetExchangeName() string
 	Stop()
 }
 
