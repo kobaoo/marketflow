@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"marketflow/internal/adapters/cache"
 	"marketflow/internal/adapters/postgres"
@@ -14,7 +15,7 @@ import (
 )
 
 func RunApp() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	_, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	infra.SetUpLogger()
@@ -30,7 +31,9 @@ func RunApp() {
 	}
 
 	db := postgres.ConnectDB(&config)
+	defer db.Close()
 	repository := postgres.NewRepository(db)
+	fmt.Println(repository, rdb)
 
 	// exchange.RunTCPClients(&config, rdb, false)
 

@@ -50,6 +50,7 @@ services:
       - marketflow-network
 
   exchange1:
+    container_name: exchange1
     image: exchange1:latest
     ports:
       - "40101:40101"
@@ -57,6 +58,7 @@ services:
       - marketflow-network
 
   exchange2:
+    container_name: exchange2
     image: exchange2:latest
     ports:
       - "40102:40102"
@@ -64,6 +66,7 @@ services:
       - marketflow-network
 
   exchange3:
+    container_name: exchange3
     image: exchange3:latest
     ports:
       - "40103:40103"

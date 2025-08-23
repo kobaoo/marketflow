@@ -15,7 +15,6 @@ func ConnectDB(config *config.Config) (*sql.DB) {
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
 	}
-	defer db.Close()
 
 	// Check if the connection works
 	err = db.Ping()
