@@ -9,7 +9,7 @@ import (
 func StartServer(config *config.Config) error {
 	mux := http.NewServeMux()
 	RegisterRouter(mux)
-	
+
 	server := &http.Server{Addr: ":" + config.Port, Handler: mux}
 
 	slog.Info("Server is starting", "port", config.Port)

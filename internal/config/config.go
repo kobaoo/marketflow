@@ -6,7 +6,7 @@ import (
 )
 
 type Config struct {
-	Port      string            `json:"port"`
+	Port      string         `json:"port"`
 	Mode      string         `json:"mode"`
 	Exchanges []Exchange     `json:"exchanges"`
 	Redis     RedisConfig    `json:"redis"`
