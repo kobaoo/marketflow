@@ -13,10 +13,11 @@ import (
 
 // TODO: implement auto reconnecting to server if connections are lost
 
-func RunTCPClients(testMode bool) {
+func RunTCPClients(allMessages chan<- []byte, testMode bool) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	allMessages := make(chan []byte, 30)
+	
+	var wg sync.WaitGroup
 
 	if testMode {
 		genMessages := make(chan []byte, 30)
@@ -25,10 +26,22 @@ func RunTCPClients(testMode bool) {
 		go StartGenerator(ctx, genMessages)
 
 	} else {
-		runTCPClient(ctx, "exchange1:40101", 1, allMessages)
-		runTCPClient(ctx, "exchange2:40102", 2, allMessages)
-		runTCPClient(ctx, "exchange3:40103", 3, allMessages)
+		wg.Add(3)
+		go func() {
+			runTCPClient(ctx, "exchange1:40101", 1, allMessages)
+			wg.Done()
+		}()
+		go func() {
+			runTCPClient(ctx, "exchange2:40102", 2, allMessages)
+			wg.Done()
+		}()
+		go func() {
+			runTCPClient(ctx, "exchange3:40103", 3, allMessages)
+			wg.Done()
+		}()
 	}
+	
+	wg.Wait()
 }
 
 func runTCPClient(ctx context.Context, address string, exchangeId int, allMessages chan<- []byte) {
@@ -79,7 +92,7 @@ func runTCPClient(ctx context.Context, address string, exchangeId int, allMessag
 
 	// Wait for shutdown
 	<-ctx.Done()
-	slog.Info("Shutting down...")
+	slog.Info("Shutting down...", "exchange", exchangeId)
 	wg.Wait()
 }
 
@@ -92,11 +105,12 @@ func worker(ctx context.Context, id, exchangeId int, jobs <-chan []byte, allMess
 			return
 		case msg, ok := <-jobs:
 			if !ok {
+				slog.Debug("Channel closed", "chanel", "messages")
 				return
 			}
 			select {
 			case allMessages <- msg:
-				slog.Debug("Worker processing message", "exchange", exchangeId, "id", id, "message", string(msg))
+				slog.Debug("Worker processing message", "exchange", exchangeId, "id", id, "message", msg)
 			default:
 				slog.Debug("Worker dropping message", "exchange", exchangeId, "id", id, "message", string(msg))
 			}
