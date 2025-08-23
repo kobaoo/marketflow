@@ -27,9 +27,9 @@ func RunTCPClients(config *config.Config, rdb *cache.RedisClient, testMode bool)
 		go StartGenerator(ctx, genMessages)
 
 	} else {
-		runTCPClient(ctx, "127.0.0.1:40101", 1, allMessages)
-		runTCPClient(ctx, "127.0.0.1:40102", 2, allMessages)
-		runTCPClient(ctx, "127.0.0.1:40103", 3, allMessages)
+		runTCPClient(ctx, "exchange1:40101", 1, allMessages)
+		runTCPClient(ctx, "exchange2:40102", 2, allMessages)
+		runTCPClient(ctx, "exchange3:40103", 3, allMessages)
 	}
 }
 
