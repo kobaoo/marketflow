@@ -1,8 +1,6 @@
 package main
 
-import (
-	"marketflow/cmd"
-)
+import "marketflow/cmd"
 
 func main() {
 	cmd.RunApp()
