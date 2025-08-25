@@ -30,7 +30,7 @@ var prices map[string]float64 = map[string]float64{
 	"ETHUSDT":  4460,
 }
 
-func (r ExchangeClient) startGenerator(ctx context.Context, exchange_name string, out chan<- domain.PriceTick) {
+func (r *ExchangeClient) startGenerator(ctx context.Context, exchange_name string, out chan<- domain.PriceTick) {
 	slog.Info("Starting price generator", "exchange", exchange_name)
 	
 	ticker := time.NewTicker(100 * time.Millisecond) // Generate prices every 100ms
@@ -43,15 +43,15 @@ func (r ExchangeClient) startGenerator(ctx context.Context, exchange_name string
 			return
 		case <-ticker.C:
 			for _, symbol := range symbols {
+				r.mu.Lock()
 				prices[symbol] = r.fluctuateNumber(prices[symbol])
-				
 				tick := domain.PriceTick{
 					Exchange: exchange_name,
 					Symbol:   symbol,
 					Price:    prices[symbol],
 					Ts:       time.Now(),
 				}
-				
+				r.mu.Unlock()
 				// Try to send, drop if channel is full
 				select {
 				case out <- tick:

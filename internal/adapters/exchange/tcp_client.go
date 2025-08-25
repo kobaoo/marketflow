@@ -8,10 +8,12 @@ import (
 	"marketflow/internal/config"
 	"marketflow/internal/domain"
 	"net"
+	"sync"
 )
 
 type ExchangeClient struct {
 	config *config.Config
+	mu sync.Mutex
 }
 
 func NewExchangeClient(config *config.Config) domain.ExchangeClient {
@@ -35,13 +37,13 @@ func (r ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTi
 	return messages
 }
 
-func (r ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
+func (r *ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
 	messages := make(chan domain.PriceTick, 30)
 
 	// Start generators for test exchanges in separate goroutines
-	go r.startGenerator(ctx, "exchange1", messages)
-	go r.startGenerator(ctx, "exchange2", messages)
-	go r.startGenerator(ctx, "exchange3", messages)
+	go r.startGenerator(ctx, "ex1", messages)
+	go r.startGenerator(ctx, "ex2", messages)
+	go r.startGenerator(ctx, "ex3", messages)
 
 	// Close channel when context is done
 	go func() {
