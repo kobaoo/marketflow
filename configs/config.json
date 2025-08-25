@@ -1,6 +1,6 @@
 {
   "port": "8400",
-  "mode": "live",
+  "mode": "test",
   "exchanges": [
     {"name":"ex1","addr":"exchange1:40101"},
     {"name":"ex2","addr":"exchange2:40102"},

@@ -9,18 +9,20 @@ import (
 	"marketflow/internal/domain"
 	"net"
 	"sync"
+	"time"
 )
 
 type ExchangeClient struct {
 	config *config.Config
 	mu sync.Mutex
+	retryDelay time.Duration
 }
 
-func NewExchangeClient(config *config.Config) domain.ExchangeClient {
-	return &ExchangeClient{config: config}
+func NewExchangeClient(config *config.Config, retryDelay time.Duration) domain.ExchangeClient {
+	return &ExchangeClient{config: config, retryDelay: retryDelay}
 }
 
-func (r ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
+func (r *ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
 	messages := make(chan domain.PriceTick, 30)
 
 	// Start TCP clients for each exchange in separate goroutines
@@ -54,50 +56,81 @@ func (r *ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceT
 	return messages
 }
 
-func (r ExchangeClient) Stop(stop context.CancelFunc) {
+func (r *ExchangeClient) Stop(stop context.CancelFunc) {
 	stop()
 }
-
-func (r ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeName string, out chan<- domain.PriceTick) {
+func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeName string, out chan<- domain.PriceTick) {
 	slog.Info("Starting TCP client", "exchange", exchangeName, "address", address)
-	
-	// Connect to TCP server
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		slog.Error("Connection error", "exchange", exchangeName, "address", address, "error", err)
-		return
-	}
-	defer conn.Close()
 
-	slog.Info("TCP client connected", "exchange", exchangeName, "address", address)
-
-	reader := bufio.NewReader(conn)
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("Shutting down tcp client", "exchange", exchangeName)
+			slog.Info("Shutting down TCP client", "exchange", exchangeName)
 			return
 		default:
-			line, err := reader.ReadBytes('\n')
+			conn, err := net.Dial("tcp", address)
 			if err != nil {
-				slog.Error("Read error", "exchange", exchangeName, "error", err)
-				return
-			}
-
-			tick := domain.PriceTick{Exchange: exchangeName}
-			err = json.Unmarshal(line, &tick)
-			if err != nil {
-				slog.Error("Error unmarshaling message", "exchange", exchangeName, "error", err, "data", string(line))
+				slog.Error("Connection error, retrying...",
+					"exchange", exchangeName,
+					"address", address,
+					"error", err)
+				time.Sleep(r.retryDelay)
 				continue
 			}
 
-			// Try to send, drop if channel is full
+			slog.Info("TCP client connected", "exchange", exchangeName, "address", address)
+
+			if err := r.handleConnection(ctx, conn, exchangeName, out); err != nil {
+				slog.Warn("Connection handler error",
+					"exchange", exchangeName,
+					"error", err)
+			}
+
+			conn.Close()
+			slog.Info("Waiting before reconnect", "exchange", exchangeName)
+			time.Sleep(r.retryDelay)
+		}
+	}
+}
+
+func (r *ExchangeClient) handleConnection(ctx context.Context, conn net.Conn, exchangeName string, out chan<- domain.PriceTick) error {
+	reader := bufio.NewReader(conn)
+
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("Context cancelled, closing connection", "exchange", exchangeName)
+			return nil
+		default:
+			conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				return err
+			}
+
+			var tick domain.PriceTick
+			if err := json.Unmarshal(line, &tick); err != nil {
+				slog.Error("Unmarshal error",
+					"exchange", exchangeName,
+					"error", err,
+					"data", string(line))
+				continue
+			}
+
+			tick.Exchange = exchangeName
+
 			select {
 			case out <- tick:
-				// sent successfully
+				// send successfully
+			case <-ctx.Done():
+				return nil
 			default:
-				slog.Debug("⚠ Dropping stale message", "exchange", exchangeName, "symbol", tick.Symbol)
+				slog.Warn("Channel full, dropping message",
+					"exchange", exchangeName,
+					"symbol", tick.Symbol)
 			}
 		}
 	}
 }
+

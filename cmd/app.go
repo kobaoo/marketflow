@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func RunApp() {
@@ -35,7 +36,7 @@ func RunApp() {
 	db := postgres.ConnectDB(&config)
 	repository := postgres.NewRepository(db)
 
-	exchangeClient := exchange.NewExchangeClient(&config)
+	exchangeClient := exchange.NewExchangeClient(&config, 5*time.Second)
 	if config.Mode == "live" {
 		messages := exchangeClient.StartLiveMode(ctx)
 		dataProcessingService := app.NewDataProcessingService(rdb, repository)
