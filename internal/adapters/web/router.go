@@ -9,7 +9,7 @@ type Handler struct {
 	marketDataService domain.MarketDataService
 }
 
-func NewHandler(marketDataService domain.MarketDataService) *Handler {
+func NewHandler(marketDataService domain.MarketDataService) domain.ServerHandler {
 	return &Handler{
 		marketDataService: marketDataService,
 	}

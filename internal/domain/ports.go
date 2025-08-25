@@ -2,6 +2,8 @@ package domain
 
 import (
 	"context"
+	"marketflow/internal/config"
+	"net/http"
 	"time"
 )
 
@@ -52,6 +54,11 @@ type Repository interface {
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
 	StopWorkers(stop context.CancelFunc)
+}
+
+type ServerHandler interface {
+	StartServer(ctx context.Context, config *config.Config) error
+	RegisterRouter(mux *http.ServeMux)
 }
 
 type MarketDataService interface {

@@ -2,7 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -34,6 +36,19 @@ func loadConfig(path string) (Config, error) {
 		return config, err
 	}
 	err = json.Unmarshal(data, &config)
+	port, err := strconv.Atoi(config.Port)
+	if err != nil {
+		return config, err
+	}
+
+	if port <= 1024 || port > 65565 {
+		return config, fmt.Errorf("invalid port number, should be between 1024 and 65565")
+	}
+
+	if config.Mode != "test" && config.Mode != "live" {
+		return config, fmt.Errorf("invalid mode, expected live or test")
+	}
+
 	return config, err
 }
 

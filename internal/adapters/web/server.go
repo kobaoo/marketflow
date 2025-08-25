@@ -7,9 +7,9 @@ import (
 	"net/http"
 )
 
-func StartServer(ctx context.Context, config *config.Config, handler *Handler) error {
+func (h *Handler) StartServer(ctx context.Context, config *config.Config) error {
 	mux := http.NewServeMux()
-	handler.RegisterRouter(mux)
+	h.RegisterRouter(mux)
 
 	server := &http.Server{Addr: ":" + config.Port, Handler: mux}
 

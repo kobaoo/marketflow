@@ -24,6 +24,7 @@ func RunApp() {
 	config, err := config.ReadConfig() // Read config
 	if err != nil {
 		slog.Error("Config Error", "error", err)
+		os.Exit(1)
 	}
 
 	rdb, err := cache.NewRedisClient(&config) // Connect to Redis
@@ -47,7 +48,7 @@ func RunApp() {
 
 	mds := app.NewMarketDataService(rdb, repository)
 	handler := web.NewHandler(mds)
-	err = web.StartServer(ctx, &config, handler)
+	err = handler.StartServer(ctx, &config)
 	if err != nil {
 		slog.Error("Error starting server", "error", err)
 	}
