@@ -58,20 +58,20 @@ type MarketDataService interface {
 	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
 	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
 
-	GetHighestPriceBySymbol() float64
-	GetHighestPriceBySymbolAndExchange() float64
-	GetHighestPriceBySymbolAndPeriod() float64
-	GetHighestPriceBySymbolAndPeriodAndExchange() float64
+	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 
-	GetLowestPriceBySymbol() float64
-	GetLowestPriceBySymbolAndExchange() float64
-	GetLowestPriceBySymbolAndPeriod() float64
-	GetLowestPriceBySymbolAndPeriodAndExchange() float64
+	GetLowestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 
-	GetAvgPriceBySymbol() float64
-	GetAvgPriceBySymbolAndExchange() float64
-	GetAvgPriceBySymbolAndPeriod() float64
-	GetAvgPriceBySymbolAndPeriodAndExchange() float64
+	GetAvgPriceBySymbol(ctx context.Context, symbol string) float64
+	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 }
 
 type SystemService interface {
