@@ -2,13 +2,13 @@
   "port": "8400",
   "mode": "live",
   "exchanges": [
-    {"name":"ex1","addr":"127.0.0.1:40101"},
-    {"name":"ex2","addr":"127.0.0.1:40102"},
-    {"name":"ex3","addr":"127.0.0.1:40103"}
+    {"name":"ex1","addr":"exchange1:40101"},
+    {"name":"ex2","addr":"exchange2:40102"},
+    {"name":"ex3","addr":"exchange3:40103"}
   ],
-  "redis": { "addr":"127.0.0.1:6379", "password":"", "db":0 },
+  "redis": { "addr":"my_redis:6379", "password":"", "db":0 },
   "postgres": {
-    "dsn":"postgres://user:pass@127.0.0.1:5432/marketflow?sslmode=disable"
+    "dsn":"postgres://postgres:secret@my_db:5432/mydb?sslmode=disable"
   }
 }
   
