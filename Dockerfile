@@ -11,14 +11,6 @@ COPY . .
 
 RUN go build -o marketflow .
 
-FROM alpine:3.20
-
-RUN adduser -D appuser
-USER appuser
-
-COPY --from=builder /app/configs /configs
-COPY --from=builder /app/marketflow /marketflow
-
 EXPOSE 8400
 
 CMD ["./marketflow"]
