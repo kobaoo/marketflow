@@ -2,8 +2,8 @@ package exchange
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
+	"marketflow/internal/domain"
 	"math/rand"
 	"time"
 )
@@ -30,26 +30,41 @@ var prices map[string]float64 = map[string]float64{
 	"ETHUSDT":  4460,
 }
 
-func StartGenerator(ctx context.Context, exchange chan<- []byte) {
+func (r ExchangeClient) startGenerator(ctx context.Context, exchange_name string, out chan<- domain.PriceTick) {
+	slog.Info("Starting price generator", "exchange", exchange_name)
+	
+	ticker := time.NewTicker(100 * time.Millisecond) // Generate prices every 100ms
+	defer ticker.Stop()
+	
 	for {
-		for _, symbol := range symbols {
-			select {
-			case <-ctx.Done():
-				close(exchange)
-				return
-			default:
-				prices[symbol] = fluctuateNumber(prices[symbol])
-				message, err := json.Marshal(Message{Symbol: symbol, Price: prices[symbol], Timestamp: time.Now().Unix()})
-				if err != nil {
-					slog.Error("Error marshalling message", "error", err)
+		select {
+		case <-ctx.Done():
+			slog.Info("Shutting down price generator", "exchange", exchange_name)
+			return
+		case <-ticker.C:
+			for _, symbol := range symbols {
+				prices[symbol] = r.fluctuateNumber(prices[symbol])
+				
+				tick := domain.PriceTick{
+					Exchange: exchange_name,
+					Symbol:   symbol,
+					Price:    prices[symbol],
+					Ts:       time.Now(),
 				}
-				exchange <- message
+				
+				// Try to send, drop if channel is full
+				select {
+				case out <- tick:
+					// sent successfully
+				default:
+					slog.Debug("⚠ Dropping stale message", "exchange", exchange_name, "symbol", symbol)
+				}
 			}
 		}
 	}
 }
 
-func fluctuateNumber(original float64) float64 {
+func (r ExchangeClient) fluctuateNumber(original float64) float64 {
 	rand.NewSource(time.Now().UnixNano())
 	fluctuation := (rand.Float64() * 0.4) - 0.2 // generate a random number between -0.2 and 0.2
 	return original * (1 + fluctuation)

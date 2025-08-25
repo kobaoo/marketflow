@@ -1,5 +1,5 @@
 {
-  "port": "8080",
+  "port": "8400",
   "mode": "live",
   "exchanges": [
     {"name":"ex1","addr":"exchange1:40101"},

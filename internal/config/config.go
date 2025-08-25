@@ -27,7 +27,6 @@ type RedisConfig struct {
 type PostgresConfig struct {
 	Dsn string `json:"dsn"`
 }
-
 func loadConfig(path string) (Config, error) {
 	var config Config
 	data, err := os.ReadFile(path)

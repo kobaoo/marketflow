@@ -11,6 +11,6 @@ COPY . .
 
 RUN go build -o marketflow .
 
-EXPOSE 8080
+EXPOSE 8400
 
 CMD ["./marketflow"]

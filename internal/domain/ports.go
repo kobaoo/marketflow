@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-type ExchangeStream interface {
-	Start(ctx context.Context)
-	GetExchangeName() string
-	Stop()
+type ExchangeClient interface {
+	StartLiveMode(ctx context.Context) <-chan PriceTick
+	StartTestMode(ctx context.Context) <-chan PriceTick
+	Stop(stop context.CancelFunc)
 }
 
 type RedisClient interface {
@@ -51,27 +51,27 @@ type Repository interface {
 
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
-	StopWorkers()
+	StopWorkers(stop context.CancelFunc)
 }
 
 type MarketDataService interface {
-	GetLatestPriceBySymbol()
-	GetLatestPriceBySymbolAndExchange()
+	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
 
-	GetHighestPriceBySymbol()
-	GetHighestPriceBySymbolAndExchange()
-	GetHighestPriceBySymbolAndPeriod()
-	GetHighestPriceBySymbolAndPeriodAndExchange()
+	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 
-	GetLowestPriceBySymbol()
-	GetLowestPriceBySymbolAndExchange()
-	GetLowestPriceBySymbolAndPeriod()
-	GetLowestPriceBySymbolAndPeriodAndExchange()
+	GetLowestPriceBySymbol(ctx context.Context, symbol string) float64
+	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 
-	GetAvgPriceBySymbol()
-	GetAvgPriceBySymbolAndExchange()
-	GetAvgPriceBySymbolAndPeriod()
-	GetAvgPriceBySymbolAndPeriodAndExchange()
+	GetAvgPriceBySymbol(ctx context.Context, symbol string) float64
+	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 }
 
 type SystemService interface {

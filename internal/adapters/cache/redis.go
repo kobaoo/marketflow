@@ -50,7 +50,7 @@ func (r *RedisClient) StoreTick(ctx context.Context, exchange, pair string, pric
 }
 
 func (r *RedisClient) ProcessLastMinute(ctx context.Context) []*domain.MinuteAgg {
-	exchanges := []string{"exchange1", "exchange2", "exchange3"}
+	exchanges := []string{"ex1", "ex2", "ex3"}
 	pairs := []string{"BTCUSDT", "DOGEUSDT", "TONUSDT", "SOLUSDT", "ETHUSDT"}
 
 	var summaries []*domain.MinuteAgg
