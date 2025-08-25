@@ -56,6 +56,7 @@ func (r *DataProcessingService) worker(ctx context.Context, in <-chan domain.Pri
 				return
 			}
 			r.redisClient.StoreTick(ctx, msg.Exchange, msg.Symbol, msg.Price)
+			// slog.Debug("Stored tick", "exchange", msg.Exchange, "symbol", msg.Symbol, "price", msg.Price)
 		}
 	}
 }

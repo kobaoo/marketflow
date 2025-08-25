@@ -20,37 +20,128 @@ func (h *Handler) getLatestPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-func getLatestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getLatestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+	exchange := r.PathValue("exchange")
+	if exchange == "" {
+		http.Error(w, "Exchange parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	price := h.marketDataService.GetLatestPriceBySymbolAndExchange(r.Context(), symbol, exchange)
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func getHighestPrice(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getHighestPrice(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+	price := h.marketDataService.GetHighestPriceBySymbol(r.Context(), symbol)
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func getHighestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getHighestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+	exchange := r.PathValue("exchange")
+	if exchange == "" {
+		http.Error(w, "Exchange parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	price := h.marketDataService.GetHighestPriceBySymbolAndExchange(r.Context(), symbol, exchange)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func getLowestPrice(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getLowestPrice(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	price := h.marketDataService.GetLowestPriceBySymbol(r.Context(), symbol)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func getLowestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getLowestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+	exchange := r.PathValue("exchange")
+	if exchange == "" {
+		http.Error(w, "Exchange parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	price := h.marketDataService.GetLowestPriceBySymbolAndExchange(r.Context(), symbol, exchange)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func getAveragePrice(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getAveragePrice(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	price := h.marketDataService.GetAvgPriceBySymbol(r.Context(), symbol)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func getAveragePriceFromExchange(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getAveragePriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	symbol := r.PathValue("symbol")
+	if symbol == "" {
+		http.Error(w, "Symbol parameter is required", http.StatusBadRequest)
+		return
+	}
+	exchange := r.PathValue("exchange")
+	if exchange == "" {
+		http.Error(w, "Exchange parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	price := h.marketDataService.GetAvgPriceBySymbolAndExchange(r.Context(), symbol, exchange)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+	if err := json.NewEncoder(w).Encode(price); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
