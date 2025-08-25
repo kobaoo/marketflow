@@ -56,7 +56,7 @@ type DataProcessingService interface {
 
 type MarketDataService interface {
 	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetLatestPriceBySymbolAndExchange() float64
+	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
 
 	GetHighestPriceBySymbol() float64
 	GetHighestPriceBySymbolAndExchange() float64

@@ -6,7 +6,7 @@ import (
 	"marketflow/internal/config"
 )
 
-func ConnectDB(config *config.Config) (*sql.DB) {
+func ConnectDB(config *config.Config) *sql.DB {
 	// Define connection string
 	connStr := config.Postgres.Dsn
 
@@ -14,13 +14,14 @@ func ConnectDB(config *config.Config) (*sql.DB) {
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
+		return nil
 	}
-	defer db.Close()
 
 	// Check if the connection works
 	err = db.Ping()
 	if err != nil {
 		slog.Error("Error pinging database", "error", err)
+		return nil
 	}
 
 	slog.Info("Connected to Postgres ✅")

@@ -45,7 +45,9 @@ func RunApp() {
 		dataProcessingService.StartWorkers(ctx, messages)
 	}
 
-	err = web.StartServer(&config)
+	mds := app.NewMarketDataService(rdb, repository)
+	handler := web.NewHandler(mds)
+	err = web.StartServer(ctx, &config, handler)
 	if err != nil {
 		slog.Error("Error starting server", "error", err)
 	}

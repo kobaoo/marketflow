@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"context"
+	"log/slog"
 	"marketflow/internal/domain"
 	"math/rand"
 	"time"
@@ -30,15 +31,34 @@ var prices map[string]float64 = map[string]float64{
 }
 
 func (r ExchangeClient) startGenerator(ctx context.Context, exchange_name string, out chan<- domain.PriceTick) {
+	slog.Info("Starting price generator", "exchange", exchange_name)
+	
+	ticker := time.NewTicker(100 * time.Millisecond) // Generate prices every 100ms
+	defer ticker.Stop()
+	
 	for {
-		for _, symbol := range symbols {
-			select {
-			case <-ctx.Done():
-				close(out)
-				return
-			default:
+		select {
+		case <-ctx.Done():
+			slog.Info("Shutting down price generator", "exchange", exchange_name)
+			return
+		case <-ticker.C:
+			for _, symbol := range symbols {
 				prices[symbol] = r.fluctuateNumber(prices[symbol])
-				out <- domain.PriceTick{Exchange: exchange_name, Symbol: symbol, Price: prices[symbol], Ts: time.Now()}
+				
+				tick := domain.PriceTick{
+					Exchange: exchange_name,
+					Symbol:   symbol,
+					Price:    prices[symbol],
+					Ts:       time.Now(),
+				}
+				
+				// Try to send, drop if channel is full
+				select {
+				case out <- tick:
+					// sent successfully
+				default:
+					slog.Debug("⚠ Dropping stale message", "exchange", exchange_name, "symbol", symbol)
+				}
 			}
 		}
 	}

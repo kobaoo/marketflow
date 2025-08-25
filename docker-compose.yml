@@ -1,12 +1,10 @@
-version: "3.8"
-
 services:
   marketflow:
     build: 
       context: .
     container_name: marketflow
     ports:
-      - "8080:8080"
+      - "8400:8400"
     environment:
       - DB_HOST=db
       - DB_USER=postgres
@@ -22,6 +20,7 @@ services:
       - exchange1
       - exchange2
       - exchange3
+    command: sh -c "sleep 5 && /marketflow"
     networks:
       - marketflow-network
 
@@ -55,6 +54,7 @@ services:
       - "40101:40101"
     networks:
       - marketflow-network
+    restart: unless-stopped
 
   exchange2:
     image: exchange2:latest
@@ -62,6 +62,7 @@ services:
       - "40102:40102"
     networks:
       - marketflow-network
+    restart: unless-stopped
 
   exchange3:
     image: exchange3:latest
@@ -69,6 +70,7 @@ services:
       - "40103:40103"
     networks:
       - marketflow-network
+    restart: unless-stopped
 
 networks:
   marketflow-network:

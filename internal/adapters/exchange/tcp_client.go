@@ -8,7 +8,6 @@ import (
 	"marketflow/internal/config"
 	"marketflow/internal/domain"
 	"net"
-	"strconv"
 )
 
 type ExchangeClient struct {
@@ -22,9 +21,16 @@ func NewExchangeClient(config *config.Config) domain.ExchangeClient {
 func (r ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
 	messages := make(chan domain.PriceTick, 30)
 
-	r.runTCPClient(ctx, "127.0.0.1:40101", 1, messages)
-	r.runTCPClient(ctx, "127.0.0.1:40102", 2, messages)
-	r.runTCPClient(ctx, "127.0.0.1:40103", 3, messages)
+	// Start TCP clients for each exchange in separate goroutines
+	for _, exchange := range r.config.Exchanges {
+		go r.runTCPClient(ctx, exchange.Addr, exchange.Name, messages)
+	}
+
+	// Close channel when context is done
+	go func() {
+		<-ctx.Done()
+		close(messages)
+	}()
 
 	return messages
 }
@@ -32,9 +38,16 @@ func (r ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTi
 func (r ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
 	messages := make(chan domain.PriceTick, 30)
 
-	r.startGenerator(ctx, "exchange1", messages)
-	r.startGenerator(ctx, "exchange2", messages)
-	r.startGenerator(ctx, "exchange3", messages)
+	// Start generators for test exchanges in separate goroutines
+	go r.startGenerator(ctx, "exchange1", messages)
+	go r.startGenerator(ctx, "exchange2", messages)
+	go r.startGenerator(ctx, "exchange3", messages)
+
+	// Close channel when context is done
+	go func() {
+		<-ctx.Done()
+		close(messages)
+	}()
 
 	return messages
 }
@@ -43,49 +56,46 @@ func (r ExchangeClient) Stop(stop context.CancelFunc) {
 	stop()
 }
 
-func (r ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeId int, out chan<- domain.PriceTick) {
+func (r ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeName string, out chan<- domain.PriceTick) {
+	slog.Info("Starting TCP client", "exchange", exchangeName, "address", address)
+	
 	// Connect to TCP server
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		slog.Error("Connection error", "error", err)
+		slog.Error("Connection error", "exchange", exchangeName, "address", address, "error", err)
 		return
 	}
 	defer conn.Close()
 
-	// TCP reader goroutine with drop-on-overflow
-	go func() {
-		reader := bufio.NewReader(conn)
-		for {
-			select {
-			case <-ctx.Done():
-				close(out)
+	slog.Info("TCP client connected", "exchange", exchangeName, "address", address)
+
+	reader := bufio.NewReader(conn)
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("Shutting down tcp client", "exchange", exchangeName)
+			return
+		default:
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				slog.Error("Read error", "exchange", exchangeName, "error", err)
 				return
+			}
+
+			tick := domain.PriceTick{Exchange: exchangeName}
+			err = json.Unmarshal(line, &tick)
+			if err != nil {
+				slog.Error("Error unmarshaling message", "exchange", exchangeName, "error", err, "data", string(line))
+				continue
+			}
+
+			// Try to send, drop if channel is full
+			select {
+			case out <- tick:
+				// sent successfully
 			default:
-				line, err := reader.ReadBytes('\n')
-				if err != nil {
-					slog.Error("Read error:", "err", err)
-					close(out)
-					return
-				}
-
-				tick := domain.PriceTick{Exchange: "exchange" + strconv.Itoa(exchangeId)}
-				err = json.Unmarshal(line, &tick)
-				if err != nil {
-					slog.Error("Error unmarshaling message")
-				}
-
-				// Try to send, drop if channel is full
-				select {
-				case out <- tick:
-					// sent successfully
-				default:
-					slog.Debug("⚠ Dropping stale message")
-				}
+				slog.Debug("⚠ Dropping stale message", "exchange", exchangeName, "symbol", tick.Symbol)
 			}
 		}
-	}()
-
-	// Wait for shutdown
-	<-ctx.Done()
-	slog.Info("Shutting down tcp client")
+	}
 }
