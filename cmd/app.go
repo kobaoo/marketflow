@@ -38,11 +38,11 @@ func RunApp() {
 	if config.Mode == "live" {
 		messages := exchangeClient.StartLiveMode(ctx)
 		dataProcessingService := app.NewDataProcessingService(rdb, repository)
-		dataProcessingService.StartWorkers(ctx, messages)
+		go dataProcessingService.StartWorkers(ctx, messages) // Run in goroutine to avoid blocking
 	} else {
 		messages := exchangeClient.StartTestMode(ctx)
 		dataProcessingService := app.NewDataProcessingService(rdb, repository)
-		dataProcessingService.StartWorkers(ctx, messages)
+		go dataProcessingService.StartWorkers(ctx, messages) // Run in goroutine to avoid blocking
 	}
 
 	mds := app.NewMarketDataService(rdb, repository)

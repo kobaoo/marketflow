@@ -19,6 +19,6 @@ USER appuser
 COPY --from=builder /app/configs /configs
 COPY --from=builder /app/marketflow /marketflow
 
-EXPOSE 8080
+EXPOSE 8400
 
 CMD ["./marketflow"]

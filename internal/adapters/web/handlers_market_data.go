@@ -20,19 +20,37 @@ func (h *Handler) getLatestPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-func getLatestPriceFromExchange(w http.ResponseWriter, r *http.Request) {}
+func getLatestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
 
-func getHighestPrice(w http.ResponseWriter, r *http.Request)                       {}
-func getHighestPriceFromExchange(w http.ResponseWriter, r *http.Request)           {}
-func getHighestPriceWithPeriod(w http.ResponseWriter, r *http.Request)             {}
-func getHighestPriceFromExchangeWithPeriod(w http.ResponseWriter, r *http.Request) {}
+func getHighestPrice(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
 
-func getLowestPrice(w http.ResponseWriter, r *http.Request)                       {}
-func getLowestPriceFromExchange(w http.ResponseWriter, r *http.Request)           {}
-func getLowestPriceWithPeriod(w http.ResponseWriter, r *http.Request)             {}
-func getLowestPriceFromExchangeWithPeriod(w http.ResponseWriter, r *http.Request) {}
+func getHighestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
 
-func getAveragePrice(w http.ResponseWriter, r *http.Request)                       {}
-func getAveragePriceFromExchange(w http.ResponseWriter, r *http.Request)           {}
-func getAveragePriceWithPeriod(w http.ResponseWriter, r *http.Request)             {}
-func getAveragePriceFromExchangeWithPeriod(w http.ResponseWriter, r *http.Request) {}
+func getLowestPrice(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
+
+func getLowestPriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
+
+func getAveragePrice(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
+
+func getAveragePriceFromExchange(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "not implemented"})
+}
