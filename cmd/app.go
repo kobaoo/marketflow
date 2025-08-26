@@ -39,16 +39,16 @@ func RunApp() {
 
     dataProcessingService := app.NewDataProcessingService(rdb, repository)
     marketDataService := app.NewMarketDataService(rdb, repository)
-    sysService := app.NewModeService(exchangeClient, dataProcessingService, rdb, repository, &cfg)
+    sysService := app.NewModeService(rootCtx, exchangeClient, dataProcessingService, rdb, repository, &cfg)
 
     switch cfg.Mode {
     case "live":
-        if err := sysService.SwitchToLiveMode(rootCtx); err != nil {
+        if err := sysService.SwitchToLiveMode(); err != nil {
             slog.Error("Failed to switch to live mode", "error", err)
             return
         }
     default:
-        if err := sysService.SwitchToTestMode(rootCtx); err != nil {
+        if err := sysService.SwitchToTestMode(); err != nil {
             slog.Error("Failed to switch to test mode", "error", err)
             return
         }

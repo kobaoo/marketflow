@@ -10,6 +10,7 @@ import (
 )
 
 type ModeServiceImpl struct {
+	appCtx          context.Context 	
 	currentMode     string
 	mu              sync.RWMutex
 	exchangeService domain.ExchangeClient
@@ -22,6 +23,7 @@ type ModeServiceImpl struct {
 }
 
 func NewModeService(
+	appCtx context.Context, 
 	exchangeService domain.ExchangeClient,
 	dataProcessor domain.DataProcessingService,
 	cache domain.RedisClient,
@@ -29,6 +31,7 @@ func NewModeService(
 	config *config.Config,
 ) domain.SystemService {
 	return &ModeServiceImpl{
+		appCtx: appCtx,
 		exchangeService: exchangeService,
 		dataProcessor:   dataProcessor,
 		cache:           cache,
@@ -38,7 +41,7 @@ func NewModeService(
 	}
 }
 
-func (m *ModeServiceImpl) SwitchToTestMode(ctx context.Context) error {
+func (m *ModeServiceImpl) SwitchToTestMode() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -50,7 +53,7 @@ func (m *ModeServiceImpl) SwitchToTestMode(ctx context.Context) error {
 
 	m.stopCurrentMode()
 
-	modeCtx, cancel := context.WithCancel(ctx)
+	modeCtx, cancel := context.WithCancel(m.appCtx)
 	m.cancelFunc = cancel
 
 	m.currentMode = "test"
@@ -63,7 +66,7 @@ func (m *ModeServiceImpl) SwitchToTestMode(ctx context.Context) error {
 	return nil
 }
 
-func (m *ModeServiceImpl) SwitchToLiveMode(ctx context.Context) error {
+func (m *ModeServiceImpl) SwitchToLiveMode() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -75,7 +78,7 @@ func (m *ModeServiceImpl) SwitchToLiveMode(ctx context.Context) error {
 
 	m.stopCurrentMode()
 
-	modeCtx, cancel := context.WithCancel(ctx)
+	modeCtx, cancel := context.WithCancel(m.appCtx)
 	m.cancelFunc = cancel
 
 	m.currentMode = "live"

@@ -82,8 +82,8 @@ type MarketDataService interface {
 }
 
 type SystemService interface {
-	SwitchToTestMode(ctx context.Context) error
-	SwitchToLiveMode(ctx context.Context) error
+	SwitchToTestMode() error
+	SwitchToLiveMode() error
 	GetCurrentMode(ctx context.Context) (string, error)
 	IsLiveMode() bool
 	Shutdown(ctx context.Context) error
