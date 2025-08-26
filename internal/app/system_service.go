@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"marketflow/internal/config"
 	"marketflow/internal/domain"
+	"strings"
 	"sync"
 	"time"
 )
@@ -139,22 +140,42 @@ func (m *ModeServiceImpl) GetSystemHealth(ctx context.Context) (domain.SystemHea
 		Exchanges:  m.CheckExchangeHealth(ctx),
 		Mode:       m.currentMode,
 		Timestamp:  time.Now(),
+	}	
+
+	issues := make([]string, 0, 4)
+
+	if !health.Redis {
+		issues = append(issues, "Redis")
+	}
+	if !health.PostgreSQL {
+		issues = append(issues, "PostgreSQL")
 	}
 
-	if !health.Redis || !health.PostgreSQL {
+	downEx := make([]string, 0)
+	for name, ok := range health.Exchanges {
+		if !ok {
+			downEx = append(downEx, name)
+		}
+	}
+	if len(downEx) > 0 {
+		issues = append(issues, "Exchanges: "+strings.Join(downEx, ", "))
+	}
+
+	if len(issues) > 0 {
 		health.Status = "degraded"
-		health.Message = "Some components are unavailable"
+		health.Message = "Some components are unavailable: " + strings.Join(issues, "; ")
 	}
 
 	return health, nil
 }
+
 
 func (m *ModeServiceImpl) CheckRedisHealth(ctx context.Context) bool {
 	if m.cache == nil {
 		return false
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 
 	price := m.cache.GetLatestPriceBySymbol(ctx, "BTCUSDT")
@@ -166,23 +187,20 @@ func (m *ModeServiceImpl) CheckPostgresHealth(ctx context.Context) bool {
 		return false
 	}
 
-	price := m.repository.GetLowestPriceBySymbol(ctx, "BTCUSDT")
-	return price > 0
+	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	err := m.repository.Ping(ctx)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (m *ModeServiceImpl) CheckExchangeHealth(ctx context.Context) map[string]bool {
-	health := make(map[string]bool)
+    names := make([]string, 0, len(m.config.Exchanges))
+    for _, ex := range m.config.Exchanges {
+        names = append(names, ex.Name)
+    }
 
-	if !m.IsLiveMode() {
-		for _, exchange := range m.config.Exchanges {
-			health[exchange.Name] = true
-		}
-		return health
-	}
-
-	for _, exchange := range m.config.Exchanges {
-		health[exchange.Name] = true
-	}
-
-	return health
+    return m.dataProcessor.ExchangesHealth(500*time.Millisecond, names)
 }

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"marketflow/internal/domain"
@@ -58,6 +59,15 @@ func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) 
 	}
 
 	return nil
+}
+
+func (r *Repository) Ping(ctx context.Context) error {
+    if r == nil || r.db == nil {
+        return errors.New("repository/db is nil")
+    }
+	
+	var one int
+    return r.db.QueryRowContext(ctx, "SELECT 1").Scan(&one)
 }
 
 func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string) float64 {

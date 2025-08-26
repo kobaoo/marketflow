@@ -34,6 +34,7 @@ type RedisClient interface {
 
 type Repository interface {
 	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg) error
+	Ping(ctx context.Context) error
 
 	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
 	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
@@ -54,6 +55,7 @@ type Repository interface {
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
 	StopWorkers()
+	ExchangesHealth(within time.Duration, names []string) map[string]bool
 }
 
 type ServerHandler interface {

@@ -9,14 +9,14 @@ import (
 )
 
 type DataProcessingService struct {
-    redisClient domain.RedisClient
-    repository  domain.Repository
-    wg          sync.WaitGroup
-    cancelFunc  context.CancelFunc
-
-    window       *WindowStore
-    redisTimeout time.Duration
-
+    redisClient   domain.RedisClient
+    repository    domain.Repository
+    wg            sync.WaitGroup
+    cancelFunc    context.CancelFunc
+    lastTickMu    sync.RWMutex
+    lastTick      map[string]time.Time
+    window        *WindowStore
+    redisTimeout  time.Duration
     breakerMu     sync.Mutex
     redisBlocked  bool
     unblockAfter  time.Time
@@ -28,6 +28,7 @@ func NewDataProcessingService(redisClient domain.RedisClient, repository domain.
         repository:   repository,
         window:       NewWindowStore(),
         redisTimeout: 150 * time.Millisecond,
+        lastTick:    make(map[string]time.Time), 
     }
 }
 
@@ -85,11 +86,12 @@ func (d *DataProcessingService) worker(ctx context.Context, in <-chan domain.Pri
                 return
             }
 
-            // 1) Пишем в RAM-окно — это наш source of truth для агрегатора
             d.window.Add(msg.Exchange, msg.Symbol, msg.Price, msg.Ts)
-
-            // 2) Пытаемся обновить Redis (latest) — best effort
             d.tryStoreToRedis(ctx, msg)
+            
+            d.lastTickMu.Lock()
+            d.lastTick[msg.Exchange] = msg.Ts
+            d.lastTickMu.Unlock()
         }
     }
 }
@@ -176,4 +178,22 @@ func (d *DataProcessingService) aggregator(ctx context.Context) {
 			}
         }
     }
+}
+
+
+func (d *DataProcessingService) ExchangesHealth(within time.Duration, names []string) map[string]bool {
+    now := time.Now()
+    out := make(map[string]bool, len(names))
+
+    d.lastTickMu.RLock()
+    defer d.lastTickMu.RUnlock()
+
+    for _, name := range names {
+        if t, ok := d.lastTick[name]; ok && now.Sub(t) <= within {
+            out[name] = true
+        } else {
+            out[name] = false
+        }
+    }
+    return out
 }
