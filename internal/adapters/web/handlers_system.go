@@ -7,7 +7,7 @@ import (
 )
 
 func (h *Handler) switchToTestMode(w http.ResponseWriter, r *http.Request) {
-	err := h.systemService.SwitchToTestMode(r.Context())
+	err := h.systemService.SwitchToTestMode()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -26,7 +26,7 @@ func (h *Handler) switchToTestMode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) switchToLiveMode(w http.ResponseWriter, r *http.Request) {
-	err := h.systemService.SwitchToLiveMode(r.Context())
+	err := h.systemService.SwitchToLiveMode()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

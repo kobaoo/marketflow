@@ -33,7 +33,7 @@ var prices map[string]float64 = map[string]float64{
 func (r *ExchangeClient) startGenerator(ctx context.Context, exchange_name string, out chan<- domain.PriceTick) {
 	slog.Info("Starting price generator", "exchange", exchange_name)
 	
-	ticker := time.NewTicker(100 * time.Millisecond) // Generate prices every 100ms
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	
 	for {
@@ -52,11 +52,10 @@ func (r *ExchangeClient) startGenerator(ctx context.Context, exchange_name strin
 					Ts:       time.Now(),
 				}
 				r.mu.Unlock()
-				// Try to send, drop if channel is full
 				select {
 				case out <- tick:
-					slog.Info("TEST SENDING")
 					// sent successfully
+					slog.Debug("SEND TEST")
 				case <-ctx.Done():
 					return
 				default:
