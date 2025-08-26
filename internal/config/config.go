@@ -27,8 +27,14 @@ type RedisConfig struct {
 }
 
 type PostgresConfig struct {
-	Dsn string `json:"dsn"`
+    Host     string `json:"host"`
+    Port     int    `json:"port"`
+    User     string `json:"user"`
+    Password string `json:"password"`
+    DBName   string `json:"dbname"`
 }
+
+
 func loadConfig(path string) (Config, error) {
 	var config Config
 	data, err := os.ReadFile(path)
@@ -47,6 +53,10 @@ func loadConfig(path string) (Config, error) {
 
 	if config.Mode != "test" && config.Mode != "live" {
 		return config, fmt.Errorf("invalid mode, expected live or test")
+	}
+
+	if config.Postgres.Port <= 1024 || config.Postgres.Port > 65565 {
+		return config, fmt.Errorf("invalid port number for postgres, should be between 1024 and 65565")
 	}
 
 	return config, err

@@ -14,7 +14,7 @@ type ExchangeClient interface {
 }
 
 type RedisClient interface {
-	StoreTick(ctx context.Context, exchange, pair string, price float64)
+	StoreTick(ctx context.Context, exchange, pair string, price float64) error
 	ProcessLastMinute(ctx context.Context) []*MinuteAgg
 
 	GetLatestPriceByPattern(ctx context.Context, pattern string) float64
@@ -33,7 +33,8 @@ type RedisClient interface {
 }
 
 type Repository interface {
-	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg)
+	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg) error
+	Ping(ctx context.Context) error
 
 	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
 	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
@@ -54,6 +55,7 @@ type Repository interface {
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
 	StopWorkers()
+	ExchangesHealth(within time.Duration, names []string) map[string]bool
 }
 
 type ServerHandler interface {

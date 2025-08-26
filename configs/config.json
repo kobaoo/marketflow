@@ -8,7 +8,10 @@
   ],
   "redis": { "addr":"my_redis:6379", "password":"", "db":0 },
   "postgres": {
-    "dsn":"postgres://postgres:secret@my_db:5432/mydb?sslmode=disable"
+    "host": "my_db",
+    "port": 5432,
+    "user": "postgres",
+    "password": "secret",
+    "dbname": "mydb"
   }
 }
-  

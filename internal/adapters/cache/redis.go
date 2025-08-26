@@ -35,18 +35,22 @@ func NewRedisClient(config *config.Config) (domain.RedisClient, error) {
 	return &RedisClient{rdb: rdb}, nil
 }
 
-func (r *RedisClient) StoreTick(ctx context.Context, exchange, pair string, price float64) {
-	key := fmt.Sprintf("%s:%s:prices", pair, exchange)
-	now := time.Now().Unix()
+func (r *RedisClient) StoreTick(ctx context.Context, exchange, pair string, price float64) error {
+    key := fmt.Sprintf("%s:%s:prices", pair, exchange)
+    now := time.Now().Unix()
 
-	// Add tick
-	r.rdb.ZAdd(ctx, key, redis.Z{
-		Score:  float64(now),
-		Member: price,
-	})
+    if err := r.rdb.ZAdd(ctx, key, redis.Z{
+        Score:  float64(now),
+        Member: price,
+    }).Err(); err != nil {
+        return fmt.Errorf("redis ZADD %q: %w", key, err)
+    }
 
-	// Remove older than 60s
-	r.rdb.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprint(now-60))
+    if err := r.rdb.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprint(now-60)).Err(); err != nil {
+        return fmt.Errorf("redis ZREMRANGEBYSCORE %q: %w", key, err)
+    }
+
+    return nil
 }
 
 func (r *RedisClient) ProcessLastMinute(ctx context.Context) []*domain.MinuteAgg {

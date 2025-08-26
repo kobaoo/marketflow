@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"marketflow/internal/domain"
@@ -20,9 +21,9 @@ func NewRepository(db *sql.DB) domain.Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) {
+func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) error {
 	if len(aggs) == 0 {
-		return
+		return fmt.Errorf("no data to save")
 	}
 
 	query := `
@@ -54,7 +55,19 @@ func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) 
 	_, err := r.db.ExecContext(ctx, stmt, valueArgs...)
 	if err != nil {
 		slog.Error("Error storing data", "err", err)
+		return err
 	}
+
+	return nil
+}
+
+func (r *Repository) Ping(ctx context.Context) error {
+    if r == nil || r.db == nil {
+        return errors.New("repository/db is nil")
+    }
+	
+	var one int
+    return r.db.QueryRowContext(ctx, "SELECT 1").Scan(&one)
 }
 
 func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string) float64 {
