@@ -2,13 +2,15 @@ package domain
 
 import (
 	"context"
+	"marketflow/internal/config"
+	"net/http"
 	"time"
 )
 
 type ExchangeClient interface {
 	StartLiveMode(ctx context.Context) <-chan PriceTick
 	StartTestMode(ctx context.Context) <-chan PriceTick
-	Stop(stop context.CancelFunc)
+	Stop()
 }
 
 type RedisClient interface {
@@ -51,7 +53,12 @@ type Repository interface {
 
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
-	StopWorkers(stop context.CancelFunc)
+	StopWorkers()
+}
+
+type ServerHandler interface {
+	StartServer(ctx context.Context, config *config.Config) error
+	RegisterRouter(mux *http.ServeMux)
 }
 
 type MarketDataService interface {
@@ -75,8 +82,16 @@ type MarketDataService interface {
 }
 
 type SystemService interface {
-	SwitchToLiveMode()
-	SwitchToTestMode()
-
-	GetHealth()
+	SwitchToTestMode(ctx context.Context) error
+	SwitchToLiveMode(ctx context.Context) error
+	GetCurrentMode(ctx context.Context) (string, error)
+	IsLiveMode() bool
+	
+	// Health check
+	GetSystemHealth(ctx context.Context) (SystemHealth, error)
+	
+	// Dependency status
+	CheckRedisHealth(ctx context.Context) bool
+	CheckPostgresHealth(ctx context.Context) bool
+	CheckExchangeHealth(ctx context.Context) map[string]bool
 }

@@ -1,17 +1,21 @@
 package web
 
 import (
+	"context"
 	"marketflow/internal/domain"
 	"net/http"
 )
 
 type Handler struct {
+	cancel 			  context.CancelFunc
 	marketDataService domain.MarketDataService
+	systemService 	  domain.SystemService
 }
 
-func NewHandler(marketDataService domain.MarketDataService) *Handler {
+func NewHandler(marketDataService domain.MarketDataService, systemService domain.SystemService) domain.ServerHandler {
 	return &Handler{
 		marketDataService: marketDataService,
+		systemService: systemService,
 	}
 }
 
@@ -30,9 +34,9 @@ func (h *Handler)RegisterRouter(mux *http.ServeMux) {
 	mux.HandleFunc("GET /prices/average/{exchange}/{symbol}", h.getAveragePriceFromExchange)
 
 	// Data Mode API
-	mux.HandleFunc("POST /mode/test", switchToTestMode)
-	mux.HandleFunc("POST /mode/live", switchToLiveMode)
+	mux.HandleFunc("POST /mode/test", h.switchToTestMode)
+	mux.HandleFunc("POST /mode/live", h.switchToLiveMode)
 
 	// System Health
-	mux.HandleFunc("GET /health", getSystemHealth)
+	mux.HandleFunc("GET /health", h.getSystemHealth)
 }

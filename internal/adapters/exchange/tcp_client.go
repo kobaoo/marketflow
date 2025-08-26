@@ -4,98 +4,134 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"marketflow/internal/config"
 	"marketflow/internal/domain"
 	"net"
+	"sync"
+	"time"
 )
 
 type ExchangeClient struct {
-	config *config.Config
+	config     *config.Config
+	mu         sync.Mutex
+	retryDelay time.Duration
+	cancelFunc context.CancelFunc // храним cancel function для остановки
 }
 
-func NewExchangeClient(config *config.Config) domain.ExchangeClient {
-	return &ExchangeClient{config: config}
+func NewExchangeClient(config *config.Config, retryDelay time.Duration) domain.ExchangeClient {
+	return &ExchangeClient{
+		config:     config,
+		retryDelay: retryDelay,
+	}
 }
 
-func (r ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
-	messages := make(chan domain.PriceTick, 30)
+func (r *ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
+	messages := make(chan domain.PriceTick, 100)
 
-	// Start TCP clients for each exchange in separate goroutines
+	// Запускаем TCP клиенты
 	for _, exchange := range r.config.Exchanges {
 		go r.runTCPClient(ctx, exchange.Addr, exchange.Name, messages)
 	}
 
-	// Close channel when context is done
-	go func() {
-		<-ctx.Done()
-		close(messages)
-	}()
-
 	return messages
 }
 
-func (r ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
+func (r *ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
 	messages := make(chan domain.PriceTick, 30)
 
-	// Start generators for test exchanges in separate goroutines
-	go r.startGenerator(ctx, "exchange1", messages)
-	go r.startGenerator(ctx, "exchange2", messages)
-	go r.startGenerator(ctx, "exchange3", messages)
+	// Проверяем, не отменен ли контекст сразу
+	if ctx.Err() != nil {
+		slog.Warn("Context already cancelled, cannot start test mode")
+		close(messages)
+		return messages
+	}
 
-	// Close channel when context is done
+	// Запускаем генераторы
+	go r.startGenerator(ctx, "ex1", messages)
+	go r.startGenerator(ctx, "ex2", messages)
+	go r.startGenerator(ctx, "ex3", messages)
+
 	go func() {
 		<-ctx.Done()
+		slog.Info("Test mode context cancelled, closing messages channel")
 		close(messages)
 	}()
 
 	return messages
 }
-
-func (r ExchangeClient) Stop(stop context.CancelFunc) {
-	stop()
+func (r *ExchangeClient) Stop() {
+	// Теперь Stop() вызывается извне, когда нужно остановить
+	slog.Info("Exchange client stop requested")
 }
 
-func (r ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeName string, out chan<- domain.PriceTick) {
+
+func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeName string, out chan<- domain.PriceTick) {
 	slog.Info("Starting TCP client", "exchange", exchangeName, "address", address)
-	
-	// Connect to TCP server
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		slog.Error("Connection error", "exchange", exchangeName, "address", address, "error", err)
-		return
-	}
-	defer conn.Close()
 
-	slog.Info("TCP client connected", "exchange", exchangeName, "address", address)
-
-	reader := bufio.NewReader(conn)
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("Shutting down tcp client", "exchange", exchangeName)
+			slog.Info("Shutting down TCP client", "exchange", exchangeName)
 			return
 		default:
-			line, err := reader.ReadBytes('\n')
+			conn, err := net.Dial("tcp", address)
 			if err != nil {
-				slog.Error("Read error", "exchange", exchangeName, "error", err)
-				return
-			}
-
-			tick := domain.PriceTick{Exchange: exchangeName}
-			err = json.Unmarshal(line, &tick)
-			if err != nil {
-				slog.Error("Error unmarshaling message", "exchange", exchangeName, "error", err, "data", string(line))
+				slog.Error("Connection error, retrying...", 
+					"exchange", exchangeName, 
+					"address", address, 
+					"error", err)
+				time.Sleep(r.retryDelay)
 				continue
 			}
 
-			// Try to send, drop if channel is full
-			select {
-			case out <- tick:
-				// sent successfully
-			default:
-				slog.Debug("⚠ Dropping stale message", "exchange", exchangeName, "symbol", tick.Symbol)
+			slog.Info("TCP client connected", "exchange", exchangeName, "address", address)
+
+			// Обрабатываем соединение
+			if err := r.handleConnection(ctx, conn, exchangeName, out); err != nil {
+				slog.Warn("Connection handler error", "exchange", exchangeName, "error", err)
 			}
+
+			conn.Close()
+			time.Sleep(r.retryDelay)
 		}
 	}
 }
+
+func (r *ExchangeClient) handleConnection(ctx context.Context, conn net.Conn, exchangeName string, out chan<- domain.PriceTick) error {
+	reader := bufio.NewReader(conn)
+
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("Context cancelled, closing connection", "exchange", exchangeName)
+			return nil
+		default:
+			conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				return err
+			}
+
+			var tick domain.PriceTick
+			if err := json.Unmarshal(line, &tick); err != nil {
+				slog.Error("Unmarshal error", "exchange", exchangeName, "error", err)
+				continue
+			}
+
+			tick.Exchange = exchangeName 
+
+			// БЕЗОПАСНАЯ отправка с проверкой контекста!
+			select {
+			case <-ctx.Done():
+				return nil // Контекст отменен, выходим
+			case out <- tick:
+				fmt.Println("SEND")
+				// Успешно отправлено
+			}
+			case <-time.After(100 * time.Millisecond):
+						slog.Warn("Send timeout, dropping message", "exchange", exchangeName)
+					}
+		}
+	}

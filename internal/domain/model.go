@@ -18,10 +18,13 @@ type MinuteAgg struct {
 	Max      float64
 }
 
-type HealthStatus struct {
-	Status     string          `json:"status"` // ok|degraded|down
-	Mode       string          `json:"mode"`   // live|test
-	RedisOK    bool            `json:"redis_ok"`
-	PostgresOK bool            `json:"postgres_ok"`
-	Sources    map[string]bool `json:"sources"` // биржа -> работает ли listener
+type SystemHealth struct {
+	Status     string          `json:"status"`      // healthy | degraded | down
+	Service    string          `json:"service"`     // marketflow
+	Message    string          `json:"message"`     // описание состояния
+	Redis      bool            `json:"redis_ok"`    // состояние Redis
+	PostgreSQL bool            `json:"postgres_ok"` // состояние Postgres
+	Exchanges  map[string]bool `json:"exchanges"`   // имя биржи -> работает ли listener
+	Mode       string          `json:"mode"`        // live | test
+	Timestamp  time.Time       `json:"timestamp"`   // время проверки
 }
