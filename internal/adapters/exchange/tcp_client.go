@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"marketflow/internal/config"
 	"marketflow/internal/domain"
@@ -13,28 +14,26 @@ import (
 )
 
 type ExchangeClient struct {
-	config *config.Config
-	mu sync.Mutex
+	config     *config.Config
+	mu         sync.Mutex
 	retryDelay time.Duration
+	cancelFunc context.CancelFunc // храним cancel function для остановки
 }
 
 func NewExchangeClient(config *config.Config, retryDelay time.Duration) domain.ExchangeClient {
-	return &ExchangeClient{config: config, retryDelay: retryDelay}
+	return &ExchangeClient{
+		config:     config,
+		retryDelay: retryDelay,
+	}
 }
 
 func (r *ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceTick {
-	messages := make(chan domain.PriceTick, 30)
+	messages := make(chan domain.PriceTick, 100)
 
-	// Start TCP clients for each exchange in separate goroutines
+	// Запускаем TCP клиенты
 	for _, exchange := range r.config.Exchanges {
 		go r.runTCPClient(ctx, exchange.Addr, exchange.Name, messages)
 	}
-
-	// Close channel when context is done
-	go func() {
-		<-ctx.Done()
-		close(messages)
-	}()
 
 	return messages
 }
@@ -42,23 +41,32 @@ func (r *ExchangeClient) StartLiveMode(ctx context.Context) <-chan domain.PriceT
 func (r *ExchangeClient) StartTestMode(ctx context.Context) <-chan domain.PriceTick {
 	messages := make(chan domain.PriceTick, 30)
 
-	// Start generators for test exchanges in separate goroutines
+	// Проверяем, не отменен ли контекст сразу
+	if ctx.Err() != nil {
+		slog.Warn("Context already cancelled, cannot start test mode")
+		close(messages)
+		return messages
+	}
+
+	// Запускаем генераторы
 	go r.startGenerator(ctx, "ex1", messages)
 	go r.startGenerator(ctx, "ex2", messages)
 	go r.startGenerator(ctx, "ex3", messages)
 
-	// Close channel when context is done
 	go func() {
 		<-ctx.Done()
+		slog.Info("Test mode context cancelled, closing messages channel")
 		close(messages)
 	}()
 
 	return messages
 }
-
-func (r *ExchangeClient) Stop(stop context.CancelFunc) {
-	stop()
+func (r *ExchangeClient) Stop() {
+	// Теперь Stop() вызывается извне, когда нужно остановить
+	slog.Info("Exchange client stop requested")
 }
+
+
 func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, exchangeName string, out chan<- domain.PriceTick) {
 	slog.Info("Starting TCP client", "exchange", exchangeName, "address", address)
 
@@ -70,9 +78,9 @@ func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, excha
 		default:
 			conn, err := net.Dial("tcp", address)
 			if err != nil {
-				slog.Error("Connection error, retrying...",
-					"exchange", exchangeName,
-					"address", address,
+				slog.Error("Connection error, retrying...", 
+					"exchange", exchangeName, 
+					"address", address, 
 					"error", err)
 				time.Sleep(r.retryDelay)
 				continue
@@ -80,14 +88,12 @@ func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, excha
 
 			slog.Info("TCP client connected", "exchange", exchangeName, "address", address)
 
+			// Обрабатываем соединение
 			if err := r.handleConnection(ctx, conn, exchangeName, out); err != nil {
-				slog.Warn("Connection handler error",
-					"exchange", exchangeName,
-					"error", err)
+				slog.Warn("Connection handler error", "exchange", exchangeName, "error", err)
 			}
 
 			conn.Close()
-			slog.Info("Waiting before reconnect", "exchange", exchangeName)
 			time.Sleep(r.retryDelay)
 		}
 	}
@@ -103,7 +109,6 @@ func (r *ExchangeClient) handleConnection(ctx context.Context, conn net.Conn, ex
 			return nil
 		default:
 			conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-			
 			line, err := reader.ReadBytes('\n')
 			if err != nil {
 				return err
@@ -111,26 +116,22 @@ func (r *ExchangeClient) handleConnection(ctx context.Context, conn net.Conn, ex
 
 			var tick domain.PriceTick
 			if err := json.Unmarshal(line, &tick); err != nil {
-				slog.Error("Unmarshal error",
-					"exchange", exchangeName,
-					"error", err,
-					"data", string(line))
+				slog.Error("Unmarshal error", "exchange", exchangeName, "error", err)
 				continue
 			}
 
-			tick.Exchange = exchangeName
+			tick.Exchange = exchangeName 
 
+			// БЕЗОПАСНАЯ отправка с проверкой контекста!
 			select {
-			case out <- tick:
-				// send successfully
 			case <-ctx.Done():
-				return nil
-			default:
-				slog.Warn("Channel full, dropping message",
-					"exchange", exchangeName,
-					"symbol", tick.Symbol)
+				return nil // Контекст отменен, выходим
+			case out <- tick:
+				fmt.Println("SEND")
+				// Успешно отправлено
 			}
+			case <-time.After(100 * time.Millisecond):
+						slog.Warn("Send timeout, dropping message", "exchange", exchangeName)
+					}
 		}
 	}
-}
-

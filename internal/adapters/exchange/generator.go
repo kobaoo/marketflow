@@ -55,7 +55,10 @@ func (r *ExchangeClient) startGenerator(ctx context.Context, exchange_name strin
 				// Try to send, drop if channel is full
 				select {
 				case out <- tick:
+					slog.Info("TEST SENDING")
 					// sent successfully
+				case <-ctx.Done():
+					return
 				default:
 					slog.Debug("⚠ Dropping stale message", "exchange", exchange_name, "symbol", symbol)
 				}

@@ -11,6 +11,8 @@ import (
 type DataProcessingService struct {
 	redisClient domain.RedisClient
 	repository  domain.Repository
+	wg          sync.WaitGroup
+	cancelFunc  context.CancelFunc
 }
 
 func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository) domain.DataProcessingService {
@@ -20,43 +22,55 @@ func NewDataProcessingService(redisClient domain.RedisClient, repository domain.
 	}
 }
 
-func (r *DataProcessingService) StartWorkers(ctx context.Context, in <-chan domain.PriceTick) {
-	var wg sync.WaitGroup
+func (d *DataProcessingService) StopWorkers() {
+	// Отменяем контекст воркеров
+	if d.cancelFunc != nil {
+		d.cancelFunc()
+	}
+}
 
-	// Start workers
-	for i := 1; i <= 15; i++ {
-		wg.Add(1)
-		go r.worker(ctx, in, &wg)
+func (d *DataProcessingService) StartWorkers(ctx context.Context, in <-chan domain.PriceTick) {
+	// Проверяем контекст
+	if ctx.Err() != nil {
+		slog.Warn("Cannot start workers: context already cancelled")
+		return
 	}
 
-	<-ctx.Done()
-	slog.Info("Shutting down...")
-	wg.Wait()
-}
-func (r *DataProcessingService) StopWorkers(stop context.CancelFunc) {
-	stop()
+	for i := 1; i <= 15; i++ {
+		d.wg.Add(1)
+		go d.worker(ctx, in, i)
+	}
+
+	slog.Info("Started data processing workers", "count", 15)
 }
 
-func (r *DataProcessingService) worker(ctx context.Context, in <-chan domain.PriceTick, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (d *DataProcessingService) worker(ctx context.Context, in <-chan domain.PriceTick, workerID int) {
+	defer d.wg.Done()
+	
+	slog.Info("Worker started", "worker", workerID)
+	defer slog.Info("Worker stopped", "worker", workerID)
+
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("Worker stopping")
 			return
+		
 		case <-ticker.C:
-			agg := r.redisClient.ProcessLastMinute(ctx)
-			r.repository.StoreMinAgg(ctx, agg)
+			// Агрегация раз в минуту
+			if agg := d.redisClient.ProcessLastMinute(ctx); len(agg) > 0 {
+				d.repository.StoreMinAgg(ctx, agg)
+			}
+		
 		case msg, ok := <-in:
 			if !ok {
-				slog.Error("Error channel closed")
+				slog.Info("Input channel closed", "worker", workerID)
 				return
 			}
-			r.redisClient.StoreTick(ctx, msg.Exchange, msg.Symbol, msg.Price)
-			// slog.Debug("Stored tick", "exchange", msg.Exchange, "symbol", msg.Symbol, "price", msg.Price)
+			// Обрабатываем тик
+			d.redisClient.StoreTick(ctx, msg.Exchange, msg.Symbol, msg.Price)
 		}
 	}
 }

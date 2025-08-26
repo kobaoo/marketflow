@@ -22,33 +22,40 @@ func RunApp() {
 
 	infra.SetUpLogger()
 
-	config, err := config.ReadConfig() // Read config
+	config, err := config.ReadConfig()
 	if err != nil {
 		slog.Error("Config Error", "error", err)
 		os.Exit(1)
 	}
 
-	rdb, err := cache.NewRedisClient(&config) // Connect to Redis
+	rdb, err := cache.NewRedisClient(&config)
 	if err != nil {
 		slog.Error("Redis Error", "error", err)
 	}
 
 	db := postgres.ConnectDB(&config)
 	repository := postgres.NewRepository(db)
-
 	exchangeClient := exchange.NewExchangeClient(&config, 5*time.Second)
-	if config.Mode == "live" {
-		messages := exchangeClient.StartLiveMode(ctx)
-		dataProcessingService := app.NewDataProcessingService(rdb, repository)
-		go dataProcessingService.StartWorkers(ctx, messages) // Run in goroutine to avoid blocking
-	} else {
-		messages := exchangeClient.StartTestMode(ctx)
-		dataProcessingService := app.NewDataProcessingService(rdb, repository)
-		go dataProcessingService.StartWorkers(ctx, messages) // Run in goroutine to avoid blocking
-	}
-
+	
+	dataProcessingService := app.NewDataProcessingService(rdb, repository)
 	mds := app.NewMarketDataService(rdb, repository)
-	handler := web.NewHandler(mds)
+	ss := app.NewModeService(exchangeClient, dataProcessingService, rdb, repository, &config)
+	
+	rootCtx := context.Background()
+
+	if config.Mode == "live" {
+		if err := ss.SwitchToLiveMode(rootCtx); err != nil {
+			slog.Error("Failed to switch to live mode", "error", err)
+			return
+		}
+	} else {
+		if err := ss.SwitchToTestMode(rootCtx); err != nil {
+			slog.Error("Failed to switch to test mode", "error", err)
+			return
+		}
+	}
+	
+	handler := web.NewHandler(mds, ss)
 	err = handler.StartServer(ctx, &config)
 	if err != nil {
 		slog.Error("Error starting server", "error", err)
