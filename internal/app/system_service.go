@@ -56,10 +56,8 @@ func (m *ModeServiceImpl) SwitchToTestMode(ctx context.Context) error {
 	modeCtx, cancel := context.WithCancel(context.Background())
 	m.cancelFunc = cancel
 	
-	// 3. Устанавливаем новый режим
 	m.currentMode = "test"
 	
-	// 4. Запускаем новый режим
 	messages := m.exchangeService.StartTestMode(modeCtx)
 	m.messagesChan = messages
 	m.startWorkers(modeCtx, messages)
@@ -146,6 +144,15 @@ func (m *ModeServiceImpl) startWorkers(ctx context.Context, messages <-chan doma
 		defer m.wg.Done()
 		m.dataProcessor.StartWorkers(ctx, messages)
 	}()
+}
+
+func (m *ModeServiceImpl) Shutdown(ctx context.Context) error {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+    slog.Info("SystemService shutdown requested", "mode", m.currentMode)
+    m.stopCurrentMode()
+    m.currentMode = "none"
+    return nil
 }
 
 func (m *ModeServiceImpl) GetCurrentMode(ctx context.Context) (string, error) {

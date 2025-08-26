@@ -86,7 +86,7 @@ type SystemService interface {
 	SwitchToLiveMode(ctx context.Context) error
 	GetCurrentMode(ctx context.Context) (string, error)
 	IsLiveMode() bool
-	
+	Shutdown(ctx context.Context) error
 	// Health check
 	GetSystemHealth(ctx context.Context) (SystemHealth, error)
 	
