@@ -44,8 +44,7 @@ func (r *ExchangeClient) startGenerator(ctx context.Context, exchange_name strin
 		case <-ticker.C:
 			for _, symbol := range symbols {
 				r.mu.Lock()
-				prices[symbol] = r.fluctuateNumber(prices[symbol])
-				tick := domain.PriceTick{
+					tick := domain.PriceTick{
 					Exchange: exchange_name,
 					Symbol:   symbol,
 					Price:    prices[symbol],
@@ -55,7 +54,6 @@ func (r *ExchangeClient) startGenerator(ctx context.Context, exchange_name strin
 				select {
 				case out <- tick:
 					// sent successfully
-					slog.Debug("SEND TEST")
 				case <-ctx.Done():
 					return
 				default:

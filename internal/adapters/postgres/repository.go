@@ -20,9 +20,9 @@ func NewRepository(db *sql.DB) domain.Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) {
+func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) error {
 	if len(aggs) == 0 {
-		return
+		return fmt.Errorf("no data to save")
 	}
 
 	query := `
@@ -54,7 +54,10 @@ func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) 
 	_, err := r.db.ExecContext(ctx, stmt, valueArgs...)
 	if err != nil {
 		slog.Error("Error storing data", "err", err)
+		return err
 	}
+
+	return nil
 }
 
 func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string) float64 {

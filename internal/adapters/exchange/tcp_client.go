@@ -122,7 +122,6 @@ func (r *ExchangeClient) handleConnection(ctx context.Context, conn net.Conn, ex
 				return nil // Контекст отменен, выходим
 			case out <- tick:
 				// Успешно отправлено
-				slog.Debug("Sending real")
 			}
 			case <-time.After(100 * time.Millisecond):
 						slog.Warn("Send timeout, dropping message", "exchange", exchangeName)
