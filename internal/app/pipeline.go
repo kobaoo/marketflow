@@ -23,11 +23,24 @@ func NewDataProcessingService(redisClient domain.RedisClient, repository domain.
 }
 
 func (d *DataProcessingService) StopWorkers() {
-	// Отменяем контекст воркеров
-	if d.cancelFunc != nil {
-		d.cancelFunc()
-	}
+    if d.cancelFunc != nil {
+        d.cancelFunc()
+    }
+
+    done := make(chan struct{})
+    go func() {
+        d.wg.Wait()
+        close(done)
+    }()
+
+    select {
+    case <-done:
+        slog.Info("All data processing workers stopped")
+    case <-time.After(5 * time.Second):
+        slog.Warn("Timeout waiting data processing workers to stop")
+    }
 }
+
 
 func (d *DataProcessingService) StartWorkers(ctx context.Context, in <-chan domain.PriceTick) {
 	// Проверяем контекст
@@ -35,6 +48,9 @@ func (d *DataProcessingService) StartWorkers(ctx context.Context, in <-chan doma
 		slog.Warn("Cannot start workers: context already cancelled")
 		return
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	d.cancelFunc = cancel
 
 	for i := 1; i <= 15; i++ {
 		d.wg.Add(1)

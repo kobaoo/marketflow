@@ -15,49 +15,66 @@ import (
 	"syscall"
 	"time"
 )
-
 func RunApp() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+    // Логгер
+    infra.SetUpLogger()
 
-	infra.SetUpLogger()
+    // Root context с перехватом сигналов
+    rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
 
-	config, err := config.ReadConfig()
-	if err != nil {
-		slog.Error("Config Error", "error", err)
-		os.Exit(1)
-	}
+    cfg, err := config.ReadConfig()
+    if err != nil {
+        slog.Error("Config Error", "error", err)
+        os.Exit(1)
+    }
 
-	rdb, err := cache.NewRedisClient(&config)
-	if err != nil {
-		slog.Error("Redis Error", "error", err)
-	}
+    // Redis
+    rdb, err := cache.NewRedisClient(&cfg)
+    if err != nil {
+        slog.Error("Redis Error", "error", err)
+    }
 
-	db := postgres.ConnectDB(&config)
-	repository := postgres.NewRepository(db)
-	exchangeClient := exchange.NewExchangeClient(&config, 5*time.Second)
-	
-	dataProcessingService := app.NewDataProcessingService(rdb, repository)
-	mds := app.NewMarketDataService(rdb, repository)
-	ss := app.NewModeService(exchangeClient, dataProcessingService, rdb, repository, &config)
-	
-	rootCtx := context.Background()
+    // Postgres
+    db := postgres.ConnectDB(&cfg)
+    repository := postgres.NewRepository(db)
 
-	if config.Mode == "live" {
-		if err := ss.SwitchToLiveMode(rootCtx); err != nil {
-			slog.Error("Failed to switch to live mode", "error", err)
-			return
-		}
-	} else {
-		if err := ss.SwitchToTestMode(rootCtx); err != nil {
-			slog.Error("Failed to switch to test mode", "error", err)
-			return
-		}
-	}
-	
-	handler := web.NewHandler(mds, ss)
-	err = handler.StartServer(ctx, &config)
-	if err != nil {
-		slog.Error("Error starting server", "error", err)
-	}
+    // Источники (биржи)
+    exchangeClient := exchange.NewExchangeClient(&cfg, 5*time.Second)
+
+    // Сервисы
+    dataProcessingService := app.NewDataProcessingService(rdb, repository)
+    marketDataService := app.NewMarketDataService(rdb, repository)
+    sysService := app.NewModeService(exchangeClient, dataProcessingService, rdb, repository, &cfg)
+
+    // Стартовый режим
+    switch cfg.Mode {
+    case "live":
+        if err := sysService.SwitchToLiveMode(rootCtx); err != nil {
+            slog.Error("Failed to switch to live mode", "error", err)
+            return
+        }
+    default:
+        if err := sysService.SwitchToTestMode(rootCtx); err != nil {
+            slog.Error("Failed to switch to test mode", "error", err)
+            return
+        }
+    }
+
+    // HTTP-сервер (должен уважать завершение по ctx.Done() внутри)
+    handler := web.NewHandler(marketDataService, sysService)
+    go func() {
+        if err := handler.StartServer(rootCtx, &cfg); err != nil {
+            slog.Error("Error starting server", "error", err)
+        }
+    }()
+
+    // Ждём сигнал
+    <-rootCtx.Done()
+    slog.Info("Interrupt received, shutting down...")
+
+    // Корректно гасим сервисы
+    _ = sysService.Shutdown(context.Background())
+
+    slog.Info("Shutdown complete")
 }
