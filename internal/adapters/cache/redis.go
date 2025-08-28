@@ -36,21 +36,21 @@ func NewRedisClient(config *config.Config) (domain.RedisClient, error) {
 }
 
 func (r *RedisClient) StoreTick(ctx context.Context, exchange, pair string, price float64) error {
-    key := fmt.Sprintf("%s:%s:prices", pair, exchange)
-    now := time.Now().Unix()
+	key := fmt.Sprintf("%s:%s:prices", pair, exchange)
+	now := time.Now().Unix()
 
-    if err := r.rdb.ZAdd(ctx, key, redis.Z{
-        Score:  float64(now),
-        Member: price,
-    }).Err(); err != nil {
-        return fmt.Errorf("redis ZADD %q: %w", key, err)
-    }
+	if err := r.rdb.ZAdd(ctx, key, redis.Z{
+		Score:  float64(now),
+		Member: price,
+	}).Err(); err != nil {
+		return fmt.Errorf("redis ZADD %q: %w", key, err)
+	}
 
-    if err := r.rdb.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprint(now-60)).Err(); err != nil {
-        return fmt.Errorf("redis ZREMRANGEBYSCORE %q: %w", key, err)
-    }
+	if err := r.rdb.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprint(now-60)).Err(); err != nil {
+		return fmt.Errorf("redis ZREMRANGEBYSCORE %q: %w", key, err)
+	}
 
-    return nil
+	return nil
 }
 
 func (r *RedisClient) ProcessLastMinute(ctx context.Context) []*domain.MinuteAgg {
@@ -105,258 +105,417 @@ func (r *RedisClient) ProcessLastMinute(ctx context.Context) []*domain.MinuteAgg
 	return summaries
 }
 
-func (r *RedisClient) GetLatestPriceByPattern(ctx context.Context, pattern string) float64 {
-	iter := r.rdb.Scan(ctx, 0, pattern, 0).Iterator()
-	for iter.Next(ctx) {
-		key := iter.Val()
-
-		val, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-			Count: 1,
-			Max:   "+inf",
-		}).Result()
-		if err != nil {
-			slog.Error("failed to query redis", "err", err)
-			continue
-		}
-		if len(val) > 0 {
-			price, _ := strconv.ParseFloat(val[0], 64)
-			return price
-		}
-	}
-
-	if err := iter.Err(); err != nil {
-		slog.Error("scan error", "err", err)
-	}
-	slog.Warn("no matching keys found", "pattern", pattern)
-	return 0
-}
-
-
-func (r *RedisClient) GetLatestPriceBySymbol(ctx context.Context, symbol string) float64 {
-	return r.GetLatestPriceByPattern(ctx, symbol + ":*:prices")
-}
-
-func (r *RedisClient) GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64 {
-	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
-	val, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-		Count: 1,
-		Max:   "+inf",
-	}).Result()
-	if len(val) == 0 {
-		slog.Error("Error geting data from Redis")
-		return 0
-	}
-	price, _ := strconv.ParseFloat(val[0], 64)
-	return price
-}
-
-func (r *RedisClient) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
-	// Example pattern: BTCUSDT:*:prices
+func (r *RedisClient) GetLatestPriceBySymbol(ctx context.Context, symbol string) (float64, error) {
 	pattern := fmt.Sprintf("%s:*:prices", symbol)
-
-	now := time.Now().Unix()
-	minScore := fmt.Sprint(now - int64(period.Seconds()))
-	maxScore := fmt.Sprint(now)
-
 	iter := r.rdb.Scan(ctx, 0, pattern, 0).Iterator()
-	var highest float64
+
+	var (
+		found  bool
+		latest int64
+		result float64
+	)
 
 	for iter.Next(ctx) {
 		key := iter.Val()
 
-		vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-			Min: minScore,
-			Max: maxScore,
-		}).Result()
+		vals, err := r.rdb.ZRevRangeWithScores(ctx, key, 0, 0).Result()
 		if err != nil {
-			slog.Error("failed to query redis", "key", key, "err", err)
+			return 0, fmt.Errorf("redis query %q: %w", key, err)
+		}
+		if len(vals) == 0 {
 			continue
 		}
 
-		for _, v := range vals {
-			price, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				slog.Error("invalid price format", "val", v, "err", err)
-				continue
-			}
-			if price > highest {
-				highest = price
-			}
+		score := int64(vals[0].Score)
+		price, err := strconv.ParseFloat(vals[0].Member.(string), 64)
+		if err != nil {
+			return 0, fmt.Errorf("parse price for %q: %w", key, err)
+		}
+
+		if !found || score > latest {
+			found = true
+			latest = score
+			result = price
 		}
 	}
 
 	if err := iter.Err(); err != nil {
-		slog.Error("scan error", "err", err)
+		return 0, fmt.Errorf("scan error: %w", err)
 	}
 
-	if highest == 0 {
-		slog.Warn("no data found in Redis", "pattern", pattern)
+	if !found {
+		return 0, domain.ErrNotFound
 	}
-	return highest
+	return result, nil
 }
 
-
-func (r *RedisClient) GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
+func (r *RedisClient) GetLatestPriceBySymbolAndExchange(
+	ctx context.Context, symbol, exchange string,
+) (float64, error) {
 	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
-	now := time.Now().Unix()
-	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-		Min: fmt.Sprint(now - int64(period.Seconds())),
-		Max: fmt.Sprint(now),
+	vals, err := r.rdb.ZRevRangeByScore(ctx, key, &redis.ZRangeBy{
+		Max:    "+inf",
+		Min:    "-inf",
+		Offset: 0,
+		Count:  1,
 	}).Result()
+	if err != nil {
+		return 0, fmt.Errorf("redis ZREVRANGEBYSCORE %q: %w", key, err)
+	}
 	if len(vals) == 0 {
-		slog.Error("Error geting data from Redis")
-		return 0
+		return 0, domain.ErrNotFound
 	}
-	max, _ := strconv.ParseFloat(vals[0], 64)
-	for _, v := range vals[1:] {
-		price, _ := strconv.ParseFloat(v, 64)
-		if price > max {
-			max = price
-		}
+
+	price, err := strconv.ParseFloat(vals[0], 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse price for %q: %w", key, err)
 	}
-	return max
+	return price, nil
 }
 
-func (r *RedisClient) GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
-	// Example pattern: BTCUSDT:*:prices
+func (r *RedisClient) GetHighestPriceBySymbolAndPeriod(
+	ctx context.Context, symbol string, period time.Duration,
+) (float64, error) {
 	pattern := fmt.Sprintf("%s:*:prices", symbol)
 
 	now := time.Now().Unix()
-	minScore := fmt.Sprint(now - int64(period.Seconds()))
-	maxScore := fmt.Sprint(now)
+	minScore := strconv.FormatInt(now-int64(period.Seconds()), 10)
+	maxScore := strconv.FormatInt(now, 10)
 
 	iter := r.rdb.Scan(ctx, 0, pattern, 0).Iterator()
-	var lowest float64
-	firstFound := false
+
+	const pageSize = 512
+	var (
+		found    bool
+		maxPrice float64
+	)
 
 	for iter.Next(ctx) {
 		key := iter.Val()
-
-		vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-			Min: minScore,
-			Max: maxScore,
-		}).Result()
-		if err != nil {
-			slog.Error("failed to query redis", "key", key, "err", err)
-			continue
-		}
-
-		for _, v := range vals {
-			price, err := strconv.ParseFloat(v, 64)
+		var offset int64
+		for {
+			vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+				Min:    minScore,
+				Max:    maxScore,
+				Offset: offset,
+				Count:  pageSize,
+			}).Result()
 			if err != nil {
-				slog.Error("invalid price format", "val", v, "err", err)
-				continue
+				return 0, fmt.Errorf("redis ZRANGEBYSCORE %q: %w", key, err)
+			}
+			if len(vals) == 0 {
+				break
 			}
 
-			if !firstFound {
-				lowest = price
-				firstFound = true
-				continue
+			for _, s := range vals {
+				p, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					return 0, fmt.Errorf("parse float for key %q: %w", key, err)
+				}
+				if !found || p > maxPrice {
+					found = true
+					maxPrice = p
+				}
 			}
 
-			if price < lowest {
-				lowest = price
+			if len(vals) < pageSize {
+				break
 			}
+			offset += int64(len(vals))
 		}
 	}
 
 	if err := iter.Err(); err != nil {
-		slog.Error("scan error", "err", err)
+		return 0, fmt.Errorf("scan error for pattern %q: %w", pattern, err)
 	}
 
-	if !firstFound {
-		slog.Warn("no data found in Redis", "pattern", pattern)
-		return 0
+	if !found {
+		return 0, domain.ErrNotFound
 	}
-
-	return lowest
+	return maxPrice, nil
 }
 
+// ===== HIGHEST (symbol + period + exchange) =====
 
-func (r *RedisClient) GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
+func (r *RedisClient) GetHighestPriceBySymbolAndPeriodAndExchange(
+	ctx context.Context, symbol, exchange string, period time.Duration,
+) (float64, error) {
 	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+
 	now := time.Now().Unix()
-	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-		Min: fmt.Sprint(now - int64(period.Seconds())),
-		Max: fmt.Sprint(now),
-	}).Result()
-	if len(vals) == 0 {
-		slog.Error("Error geting data from Redis")
-		return 0
-	}
-	min, _ := strconv.ParseFloat(vals[0], 64)
-	for _, v := range vals[1:] {
-		price, _ := strconv.ParseFloat(v, 64)
-		if price < min {
-			min = price
+	minScore := strconv.FormatInt(now-int64(period.Seconds()), 10)
+	maxScore := strconv.FormatInt(now, 10)
+
+	const pageSize = 512
+	var (
+		found  bool
+		maxVal float64
+		offset int64
+	)
+
+	for {
+		vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+			Min:    minScore,
+			Max:    maxScore,
+			Offset: offset,
+			Count:  pageSize,
+		}).Result()
+		if err != nil {
+			return 0, fmt.Errorf("redis ZRANGEBYSCORE %q: %w", key, err)
 		}
+		if len(vals) == 0 {
+			break
+		}
+
+		for _, s := range vals {
+			p, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				return 0, fmt.Errorf("parse float for key %q: %w", key, err)
+			}
+			if !found || p > maxVal {
+				found = true
+				maxVal = p
+			}
+		}
+
+		if len(vals) < pageSize {
+			break
+		}
+		offset += int64(len(vals))
 	}
-	return min
+
+	if !found {
+		return 0, domain.ErrNotFound
+	}
+	return maxVal, nil
 }
 
-func (r *RedisClient) GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
-	// Example pattern: BTCUSDT:*:prices
+// ===== LOWEST =====
+
+func (r *RedisClient) GetLowestPriceBySymbolAndPeriod(
+	ctx context.Context, symbol string, period time.Duration,
+) (float64, error) {
 	pattern := fmt.Sprintf("%s:*:prices", symbol)
 
 	now := time.Now().Unix()
-	minScore := fmt.Sprint(now - int64(period.Seconds()))
-	maxScore := fmt.Sprint(now)
+	minScore := strconv.FormatInt(now-int64(period.Seconds()), 10)
+	maxScore := strconv.FormatInt(now, 10)
 
 	iter := r.rdb.Scan(ctx, 0, pattern, 0).Iterator()
-	var sum float64
-	var count int
+
+	const pageSize = 512
+	var (
+		found  bool
+		minVal float64
+	)
 
 	for iter.Next(ctx) {
 		key := iter.Val()
-
-		vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-			Min: minScore,
-			Max: maxScore,
-		}).Result()
-		if err != nil {
-			slog.Error("failed to query redis", "key", key, "err", err)
-			continue
-		}
-
-		for _, v := range vals {
-			price, err := strconv.ParseFloat(v, 64)
+		var offset int64
+		for {
+			vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+				Min:    minScore,
+				Max:    maxScore,
+				Offset: offset,
+				Count:  pageSize,
+			}).Result()
 			if err != nil {
-				slog.Error("invalid price format", "val", v, "err", err)
-				continue
+				return 0, fmt.Errorf("redis ZRANGEBYSCORE %q: %w", key, err)
 			}
-			sum += price
-			count++
+			if len(vals) == 0 {
+				break
+			}
+
+			for _, s := range vals {
+				p, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					return 0, fmt.Errorf("parse float for key %q: %w", key, err)
+				}
+				if !found || p < minVal {
+					found = true
+					minVal = p
+				}
+			}
+
+			if len(vals) < pageSize {
+				break
+			}
+			offset += int64(len(vals))
 		}
 	}
 
 	if err := iter.Err(); err != nil {
-		slog.Error("scan error", "err", err)
+		return 0, fmt.Errorf("scan error for pattern %q: %w", pattern, err)
+	}
+
+	if !found {
+		return 0, domain.ErrNotFound
+	}
+	return minVal, nil
+}
+
+func (r *RedisClient) GetLowestPriceBySymbolAndPeriodAndExchange(
+	ctx context.Context, symbol, exchange string, period time.Duration,
+) (float64, error) {
+	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+
+	now := time.Now().Unix()
+	minScore := strconv.FormatInt(now-int64(period.Seconds()), 10)
+	maxScore := strconv.FormatInt(now, 10)
+
+	const pageSize = 512
+	var (
+		found  bool
+		minVal float64
+		offset int64
+	)
+
+	for {
+		vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+			Min:    minScore,
+			Max:    maxScore,
+			Offset: offset,
+			Count:  pageSize,
+		}).Result()
+		if err != nil {
+			return 0, fmt.Errorf("redis ZRANGEBYSCORE %q: %w", key, err)
+		}
+		if len(vals) == 0 {
+			break
+		}
+
+		for _, s := range vals {
+			p, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				return 0, fmt.Errorf("parse float for key %q: %w", key, err)
+			}
+			if !found || p < minVal {
+				found = true
+				minVal = p
+			}
+		}
+
+		if len(vals) < pageSize {
+			break
+		}
+		offset += int64(len(vals))
+	}
+
+	if !found {
+		return 0, domain.ErrNotFound
+	}
+	return minVal, nil
+}
+
+// ===== AVERAGE =====
+
+func (r *RedisClient) GetAvgPriceBySymbolAndPeriod(
+	ctx context.Context, symbol string, period time.Duration,
+) (float64, error) {
+	pattern := fmt.Sprintf("%s:*:prices", symbol)
+
+	now := time.Now().Unix()
+	minScore := strconv.FormatInt(now-int64(period.Seconds()), 10)
+	maxScore := strconv.FormatInt(now, 10)
+
+	iter := r.rdb.Scan(ctx, 0, pattern, 0).Iterator()
+
+	const pageSize = 512
+	var (
+		sum   float64
+		count int64
+	)
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+		var offset int64
+		for {
+			vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+				Min:    minScore,
+				Max:    maxScore,
+				Offset: offset,
+				Count:  pageSize,
+			}).Result()
+			if err != nil {
+				return 0, fmt.Errorf("redis ZRANGEBYSCORE %q: %w", key, err)
+			}
+			if len(vals) == 0 {
+				break
+			}
+
+			for _, s := range vals {
+				p, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					return 0, fmt.Errorf("parse float for key %q: %w", key, err)
+				}
+				sum += p
+				count++
+			}
+
+			if len(vals) < pageSize {
+				break
+			}
+			offset += int64(len(vals))
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return 0, fmt.Errorf("scan error for pattern %q: %w", pattern, err)
 	}
 
 	if count == 0 {
-		slog.Warn("no data found in Redis", "pattern", pattern)
-		return 0
+		return 0, domain.ErrNotFound
 	}
-
-	return sum / float64(count)
+	return sum / float64(count), nil
 }
 
-func (r *RedisClient) GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
+func (r *RedisClient) GetAvgPriceBySymbolAndPeriodAndExchange(
+	ctx context.Context, symbol, exchange string, period time.Duration,
+) (float64, error) {
 	key := fmt.Sprintf("%s:%s:prices", symbol, exchange)
+
 	now := time.Now().Unix()
-	vals, _ := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-		Min: fmt.Sprint(now - int64(period.Seconds())),
-		Max: fmt.Sprint(now),
-	}).Result()
-	if len(vals) == 0 {
-		slog.Error("Error geting data from Redis")
-		return 0
+	minScore := strconv.FormatInt(now-int64(period.Seconds()), 10)
+	maxScore := strconv.FormatInt(now, 10)
+
+	const pageSize = 512
+	var (
+		sum    float64
+		count  int64
+		offset int64
+	)
+
+	for {
+		vals, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+			Min:    minScore,
+			Max:    maxScore,
+			Offset: offset,
+			Count:  pageSize,
+		}).Result()
+		if err != nil {
+			return 0, fmt.Errorf("redis ZRANGEBYSCORE %q: %w", key, err)
+		}
+		if len(vals) == 0 {
+			break
+		}
+
+		for _, s := range vals {
+			p, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				return 0, fmt.Errorf("parse float for key %q: %w", key, err)
+			}
+			sum += p
+			count++
+		}
+
+		if len(vals) < pageSize {
+			break
+		}
+		offset += int64(len(vals))
 	}
-	var sum float64
-	for _, v := range vals {
-		price, _ := strconv.ParseFloat(v, 64)
-		sum += price
+
+	if count == 0 {
+		return 0, domain.ErrNotFound
 	}
-	avg := sum / float64(len(vals))
-	return avg
+	return sum / float64(count), nil
 }

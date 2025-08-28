@@ -27,13 +27,12 @@ type RedisConfig struct {
 }
 
 type PostgresConfig struct {
-    Host     string `json:"host"`
-    Port     int    `json:"port"`
-    User     string `json:"user"`
-    Password string `json:"password"`
-    DBName   string `json:"dbname"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	DBName   string `json:"dbname"`
 }
-
 
 func loadConfig(path string) (Config, error) {
 	var config Config
@@ -45,6 +44,10 @@ func loadConfig(path string) (Config, error) {
 	port, err := strconv.Atoi(config.Port)
 	if err != nil {
 		return config, err
+	}
+
+	if Port != 0 {
+		port = Port
 	}
 
 	if port <= 1024 || port > 65565 {

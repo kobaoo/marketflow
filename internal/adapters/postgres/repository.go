@@ -31,7 +31,6 @@ func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) 
 		VALUES %s
 	`
 
-	// Build placeholders dynamically: ($1,$2,$3,$4,$5,$6), ($7,$8,$9,$10,$11,$12), ...
 	valueStrings := make([]string, 0, len(aggs))
 	valueArgs := make([]interface{}, 0, len(aggs)*6)
 
@@ -62,15 +61,15 @@ func (r *Repository) StoreMinAgg(ctx context.Context, aggs []*domain.MinuteAgg) 
 }
 
 func (r *Repository) Ping(ctx context.Context) error {
-    if r == nil || r.db == nil {
-        return errors.New("repository/db is nil")
-    }
-	
+	if r == nil || r.db == nil {
+		return errors.New("repository/db is nil")
+	}
+
 	var one int
-    return r.db.QueryRowContext(ctx, "SELECT 1").Scan(&one)
+	return r.db.QueryRowContext(ctx, "SELECT 1").Scan(&one)
 }
 
-func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string) float64 {
+func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string) (float64, error) {
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MAX(max_price)
@@ -79,13 +78,15 @@ func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string)
 		GROUP BY pair_name
 		`, symbol).Scan(&price)
 	if err != nil {
-		slog.Error("Repository error", "err", err)
-		return 0
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64 {
+func (r *Repository) GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error) {
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MAX(max_price)
@@ -94,45 +95,39 @@ func (r *Repository) GetHighestPriceBySymbolAndExchange(ctx context.Context, sym
 		GROUP BY pair_name, exchange
 		`, symbol, exchange).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
-	now := time.Now().Unix()
+func (r *Repository) GetHighestPriceBySymbolAndPeriod(
+	ctx context.Context, symbol string, period time.Duration,
+) (float64, error) {
+	cutoff := time.Now().UTC().Add(-period)
+
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MAX(max_price)
 		FROM minute_prices
-		WHERE pair_name = $1 AND timestamp > $2
+		WHERE pair_name = $1
+		  AND "timestamp" > $2
 		GROUP BY pair_name
-		`, symbol, now-int64(period.Seconds())).Scan(&price)
+	`, symbol, cutoff).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
-	now := time.Now().Unix()
-	var price float64
-	err := r.db.QueryRowContext(ctx, `
-		SELECT MAX(max_price)
-		FROM minute_prices
-		WHERE pair_name = $1 AND exchange = $2 AND timestamp > $3
-		GROUP BY pair_name, exchange
-		`, symbol, exchange, now-int64(period.Seconds())).Scan(&price)
-	if err != nil {
-		slog.Error("Repository error", "err", err)
-		return 0
-	}
-	return price
-}
-
-func (r *Repository) GetLowestPriceBySymbol(ctx context.Context, symbol string) float64 {
+func (r *Repository) GetLowestPriceBySymbol(ctx context.Context, symbol string) (float64, error) {
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MIN(min_price)
@@ -141,117 +136,189 @@ func (r *Repository) GetLowestPriceBySymbol(ctx context.Context, symbol string) 
 		GROUP BY pair_name
 		`, symbol).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64 {
+func (r *Repository) GetHighestPriceBySymbolAndPeriodAndExchange(
+	ctx context.Context, symbol, exchange string, period time.Duration,
+) (float64, error) {
+	cutoff := time.Now().UTC().Add(-period)
+
+	var price float64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT MAX(max_price)
+		FROM minute_prices
+		WHERE pair_name = $1
+		  AND exchange  = $2
+		  AND "timestamp" > $3
+		GROUP BY pair_name, exchange
+	`, symbol, exchange, cutoff).Scan(&price)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
+		slog.Error("Repository error", "err", err)
+		return 0, err
+	}
+	return price, nil
+}
+
+func (r *Repository) GetLowestPriceBySymbolAndExchange(
+	ctx context.Context, symbol, exchange string,
+) (float64, error) {
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MIN(min_price)
 		FROM minute_prices
 		WHERE pair_name = $1 AND exchange = $2
 		GROUP BY pair_name, exchange
-		`, symbol, exchange).Scan(&price)
+	`, symbol, exchange).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
-	now := time.Now().Unix()
+func (r *Repository) GetLowestPriceBySymbolAndPeriod(
+	ctx context.Context, symbol string, period time.Duration,
+) (float64, error) {
+	cutoff := time.Now().UTC().Add(-period)
+
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MIN(min_price)
 		FROM minute_prices
-		WHERE pair_name = $1 AND timestamp > $2
+		WHERE pair_name = $1
+		  AND "timestamp" > $2
 		GROUP BY pair_name
-		`, symbol, now-int64(period.Seconds())).Scan(&price)
+	`, symbol, cutoff).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
-	now := time.Now().Unix()
+func (r *Repository) GetLowestPriceBySymbolAndPeriodAndExchange(
+	ctx context.Context, symbol, exchange string, period time.Duration,
+) (float64, error) {
+	cutoff := time.Now().UTC().Add(-period)
+
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MIN(min_price)
 		FROM minute_prices
-		WHERE pair_name = $1 AND exchange = $2 AND timestamp > $3
+		WHERE pair_name = $1
+		  AND exchange  = $2
+		  AND "timestamp" > $3
 		GROUP BY pair_name, exchange
-		`, symbol, exchange, now-int64(period.Seconds())).Scan(&price)
+	`, symbol, exchange, cutoff).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetAvgPriceBySymbol(ctx context.Context, symbol string) float64 {
+func (r *Repository) GetAvgPriceBySymbol(
+	ctx context.Context, symbol string,
+) (float64, error) {
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT AVG(average_price)
 		FROM minute_prices
 		WHERE pair_name = $1
 		GROUP BY pair_name
-		`, symbol).Scan(&price)
+	`, symbol).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64 {
+func (r *Repository) GetAvgPriceBySymbolAndExchange(
+	ctx context.Context, symbol, exchange string,
+) (float64, error) {
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT AVG(average_price)
 		FROM minute_prices
 		WHERE pair_name = $1 AND exchange = $2
 		GROUP BY pair_name, exchange
-		`, symbol, exchange).Scan(&price)
+	`, symbol, exchange).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64 {
-	now := time.Now().Unix()
+func (r *Repository) GetAvgPriceBySymbolAndPeriod(
+	ctx context.Context, symbol string, period time.Duration,
+) (float64, error) {
+	cutoff := time.Now().UTC().Add(-period)
+
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT AVG(average_price)
 		FROM minute_prices
-		WHERE pair_name = $1 AND timestamp > $2
+		WHERE pair_name = $1
+		  AND "timestamp" > $2
 		GROUP BY pair_name
-		`, symbol, now-int64(period.Seconds())).Scan(&price)
+	`, symbol, cutoff).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }
 
-func (r *Repository) GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64 {
-	now := time.Now().Unix()
+func (r *Repository) GetAvgPriceBySymbolAndPeriodAndExchange(
+	ctx context.Context, symbol, exchange string, period time.Duration,
+) (float64, error) {
+	cutoff := time.Now().UTC().Add(-period)
+
 	var price float64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT AVG(average_price)
 		FROM minute_prices
-		WHERE pair_name = $1 AND exchange = $2 AND timestamp > $3
+		WHERE pair_name = $1
+		  AND exchange  = $2
+		  AND "timestamp" > $3
 		GROUP BY pair_name, exchange
-		`, symbol, exchange, now-int64(period.Seconds())).Scan(&price)
+	`, symbol, exchange, cutoff).Scan(&price)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, domain.ErrNotFound
+		}
 		slog.Error("Repository error", "err", err)
-		return 0
+		return 0, err
 	}
-	return price
+	return price, nil
 }

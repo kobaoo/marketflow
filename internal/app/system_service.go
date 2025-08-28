@@ -11,7 +11,7 @@ import (
 )
 
 type ModeServiceImpl struct {
-	appCtx          context.Context 	
+	appCtx          context.Context
 	currentMode     string
 	mu              sync.RWMutex
 	exchangeService domain.ExchangeClient
@@ -24,7 +24,7 @@ type ModeServiceImpl struct {
 }
 
 func NewModeService(
-	appCtx context.Context, 
+	appCtx context.Context,
 	exchangeService domain.ExchangeClient,
 	dataProcessor domain.DataProcessingService,
 	cache domain.RedisClient,
@@ -32,7 +32,7 @@ func NewModeService(
 	config *config.Config,
 ) domain.SystemService {
 	return &ModeServiceImpl{
-		appCtx: appCtx,
+		appCtx:          appCtx,
 		exchangeService: exchangeService,
 		dataProcessor:   dataProcessor,
 		cache:           cache,
@@ -58,7 +58,7 @@ func (m *ModeServiceImpl) SwitchToTestMode() error {
 	m.cancelFunc = cancel
 
 	m.currentMode = "test"
-	
+
 	messages := m.exchangeService.StartTestMode(modeCtx)
 	m.messagesChan = messages
 	m.dataProcessor.StartWorkers(modeCtx, messages)
@@ -140,7 +140,7 @@ func (m *ModeServiceImpl) GetSystemHealth(ctx context.Context) (domain.SystemHea
 		Exchanges:  m.CheckExchangeHealth(ctx),
 		Mode:       m.currentMode,
 		Timestamp:  time.Now(),
-	}	
+	}
 
 	issues := make([]string, 0, 4)
 
@@ -169,7 +169,6 @@ func (m *ModeServiceImpl) GetSystemHealth(ctx context.Context) (domain.SystemHea
 	return health, nil
 }
 
-
 func (m *ModeServiceImpl) CheckRedisHealth(ctx context.Context) bool {
 	if m.cache == nil {
 		return false
@@ -178,7 +177,7 @@ func (m *ModeServiceImpl) CheckRedisHealth(ctx context.Context) bool {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 
-	price := m.cache.GetLatestPriceBySymbol(ctx, "BTCUSDT")
+	price, _ := m.cache.GetLatestPriceBySymbol(ctx, "BTCUSDT")
 	return price > 0
 }
 
@@ -197,10 +196,10 @@ func (m *ModeServiceImpl) CheckPostgresHealth(ctx context.Context) bool {
 }
 
 func (m *ModeServiceImpl) CheckExchangeHealth(ctx context.Context) map[string]bool {
-    names := make([]string, 0, len(m.config.Exchanges))
-    for _, ex := range m.config.Exchanges {
-        names = append(names, ex.Name)
-    }
+	names := make([]string, 0, len(m.config.Exchanges))
+	for _, ex := range m.config.Exchanges {
+		names = append(names, ex.Name)
+	}
 
-    return m.dataProcessor.ExchangesHealth(500*time.Millisecond, names)
+	return m.dataProcessor.ExchangesHealth(500*time.Millisecond, names)
 }
