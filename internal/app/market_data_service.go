@@ -9,12 +9,14 @@ import (
 type MarketDataService struct {
 	redisClient domain.RedisClient
 	repository  domain.Repository
+	windowStore domain.WindowStore
 }
 
-func NewMarketDataService(redisClient domain.RedisClient, repository domain.Repository) domain.MarketDataService {
+func NewMarketDataService(redisClient domain.RedisClient, repository domain.Repository, window domain.WindowStore) domain.MarketDataService {
 	return &MarketDataService{
 		redisClient: redisClient,
 		repository:  repository,
+		windowStore: window,
 	}
 }
 

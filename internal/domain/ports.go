@@ -52,6 +52,12 @@ type Repository interface {
 	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
 }
 
+type WindowStore interface {
+	Add(exchange, symbol string, price float64, ts time.Time)
+	Snapshot() map[Key][]Tick
+	Latest(exchange, symbol string) (float64, bool)
+}
+
 type DataProcessingService interface {
 	StartWorkers(ctx context.Context, in <-chan PriceTick)
 	StopWorkers()

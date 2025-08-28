@@ -1,37 +1,27 @@
 package app
 
 import (
+	"marketflow/internal/domain"
 	"sync"
 	"time"
 )
 
-
-type key struct {
-    Exchange string
-    Symbol   string
-}
-
-type tick struct {
-    Ts    time.Time
-    Price float64
-}
-
 type WindowStore struct {
-    mu   sync.RWMutex
-    data map[key][]tick 
+    mu sync.RWMutex
+    data map[domain.Key][]domain.Tick
 }
 
-func NewWindowStore() *WindowStore {
-    return &WindowStore{data: make(map[key][]tick)}
+func NewWindowStore() domain.WindowStore {
+    return &WindowStore{data: make(map[domain.Key][]domain.Tick)}
 }
 
 func (w *WindowStore) Add(exchange, symbol string, price float64, ts time.Time) {
-    k := key{exchange, symbol}
+    k := domain.Key{Exchange:exchange, Symbol: symbol}
     w.mu.Lock()
     defer w.mu.Unlock()
 
     arr := w.data[k]
-    arr = append(arr, tick{Ts: ts, Price: price})
+    arr = append(arr, domain.Tick{Ts: ts, Price: price})
 
     cutoff := ts.Add(-time.Minute)
     i := 0
@@ -44,12 +34,12 @@ func (w *WindowStore) Add(exchange, symbol string, price float64, ts time.Time) 
     w.data[k] = arr
 }
 
-func (w *WindowStore) Snapshot() map[key][]tick {
+func (w *WindowStore) Snapshot() map[domain.Key][]domain.Tick {
     w.mu.RLock()
     defer w.mu.RUnlock()
-    out := make(map[key][]tick, len(w.data))
+    out := make(map[domain.Key][]domain.Tick, len(w.data))
     for k, v := range w.data {
-        vv := make([]tick, len(v))
+        vv := make([]domain.Tick, len(v))
         copy(vv, v)
         out[k] = vv
     }
@@ -57,7 +47,7 @@ func (w *WindowStore) Snapshot() map[key][]tick {
 }
 
 func (w *WindowStore) Latest(exchange, symbol string) (float64, bool) {
-    k := key{exchange, symbol}
+    k := domain.Key{Exchange: exchange, Symbol: symbol}
     w.mu.RLock()
     defer w.mu.RUnlock()
     arr, ok := w.data[k]

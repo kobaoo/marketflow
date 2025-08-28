@@ -28,3 +28,13 @@ type SystemHealth struct {
 	Mode       string          `json:"mode"`        // live | test
 	Timestamp  time.Time       `json:"timestamp"`   // время проверки
 }
+
+type Key struct {
+    Exchange string
+    Symbol   string
+}
+
+type Tick struct {
+    Ts    time.Time
+    Price float64
+}

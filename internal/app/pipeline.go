@@ -15,18 +15,18 @@ type DataProcessingService struct {
     cancelFunc    context.CancelFunc
     lastTickMu    sync.RWMutex
     lastTick      map[string]time.Time
-    window        *WindowStore
+    window        domain.WindowStore
     redisTimeout  time.Duration
     breakerMu     sync.Mutex
     redisBlocked  bool
     unblockAfter  time.Time
 }
 
-func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository) domain.DataProcessingService {
+func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository, window domain.WindowStore) domain.DataProcessingService {
     return &DataProcessingService{
         redisClient:  redisClient,
         repository:   repository,
-        window:       NewWindowStore(),
+        window:        window,
         redisTimeout: 150 * time.Millisecond,
         lastTick:    make(map[string]time.Time), 
     }

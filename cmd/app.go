@@ -37,8 +37,9 @@ func RunApp() {
 
     exchangeClient := exchange.NewExchangeClient(&cfg, 5*time.Second)
 
-    dataProcessingService := app.NewDataProcessingService(rdb, repository)
-    marketDataService := app.NewMarketDataService(rdb, repository)
+    window := app.NewWindowStore()
+    dataProcessingService := app.NewDataProcessingService(rdb, repository, window)
+    marketDataService := app.NewMarketDataService(rdb, repository, window)
     sysService := app.NewModeService(rootCtx, exchangeClient, dataProcessingService, rdb, repository, &cfg)
 
     switch cfg.Mode {
