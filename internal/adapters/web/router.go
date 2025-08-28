@@ -1,25 +1,23 @@
 package web
 
 import (
-	"context"
 	"marketflow/internal/domain"
 	"net/http"
 )
 
 type Handler struct {
-	cancel 			  context.CancelFunc
 	marketDataService domain.MarketDataService
-	systemService 	  domain.SystemService
+	systemService     domain.SystemService
 }
 
 func NewHandler(marketDataService domain.MarketDataService, systemService domain.SystemService) domain.ServerHandler {
 	return &Handler{
 		marketDataService: marketDataService,
-		systemService: systemService,
+		systemService:     systemService,
 	}
 }
 
-func (h *Handler)RegisterRouter(mux *http.ServeMux) {
+func (h *Handler) RegisterRouter(mux *http.ServeMux) {
 	// Market Data API
 	mux.HandleFunc("GET /prices/latest/{symbol}", h.getLatestPrice)
 	mux.HandleFunc("GET /prices/latest/{exchange}/{symbol}", h.getLatestPriceFromExchange)

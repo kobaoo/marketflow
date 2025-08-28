@@ -15,56 +15,59 @@ import (
 	"syscall"
 	"time"
 )
+
 func RunApp() {
-    infra.SetUpLogger()
+	config.ParseFlags()
+	infra.SetUpLogger()
 
-    rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-    defer stop()
+	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-    cfg, err := config.ReadConfig()
-    if err != nil {
-        slog.Error("Config Error", "error", err)
-        os.Exit(1)
-    }
+	cfg, err := config.ReadConfig()
+	if err != nil {
+		slog.Error("Config Error", "error", err)
+		os.Exit(1)
+	}
 
-    rdb, err := cache.NewRedisClient(&cfg)
-    if err != nil {
-        slog.Error("Redis Error", "error", err)
-    }
+	rdb, err := cache.NewRedisClient(&cfg)
+	if err != nil {
+		slog.Error("Redis Error", "error", err)
+	}
 
-    db := postgres.ConnectDB(&cfg)
-    repository := postgres.NewRepository(db)
+	db := postgres.ConnectDB(&cfg)
+	repository := postgres.NewRepository(db)
 
-    exchangeClient := exchange.NewExchangeClient(&cfg, 5*time.Second)
+	exchangeClient := exchange.NewExchangeClient(&cfg, 5*time.Second)
 
-    dataProcessingService := app.NewDataProcessingService(rdb, repository)
-    marketDataService := app.NewMarketDataService(rdb, repository)
-    sysService := app.NewModeService(rootCtx, exchangeClient, dataProcessingService, rdb, repository, &cfg)
+	window := app.NewWindowStore()
+	dataProcessingService := app.NewDataProcessingService(rdb, repository, window)
+	marketDataService := app.NewMarketDataService(rdb, repository, window)
+	sysService := app.NewModeService(rootCtx, exchangeClient, dataProcessingService, rdb, repository, &cfg)
 
-    switch cfg.Mode {
-    case "live":
-        if err := sysService.SwitchToLiveMode(); err != nil {
-            slog.Error("Failed to switch to live mode", "error", err)
-            return
-        }
-    default:
-        if err := sysService.SwitchToTestMode(); err != nil {
-            slog.Error("Failed to switch to test mode", "error", err)
-            return
-        }
-    }
+	switch cfg.Mode {
+	case "live":
+		if err := sysService.SwitchToLiveMode(); err != nil {
+			slog.Error("Failed to switch to live mode", "error", err)
+			return
+		}
+	default:
+		if err := sysService.SwitchToTestMode(); err != nil {
+			slog.Error("Failed to switch to test mode", "error", err)
+			return
+		}
+	}
 
-    handler := web.NewHandler(marketDataService, sysService)
-    go func() {
-        if err := handler.StartServer(rootCtx, &cfg); err != nil {
-            slog.Error("Error starting server", "error", err)
-        }
-    }()
+	handler := web.NewHandler(marketDataService, sysService)
+	go func() {
+		if err := handler.StartServer(rootCtx, &cfg); err != nil {
+			slog.Error("Error starting server", "error", err)
+		}
+	}()
 
-    <-rootCtx.Done()
-    slog.Info("Interrupt received, shutting down...")
+	<-rootCtx.Done()
+	slog.Info("Interrupt received, shutting down...")
 
-    _ = sysService.Shutdown(context.Background())
+	_ = sysService.Shutdown(context.Background())
 
-    slog.Info("Shutdown complete")
+	slog.Info("Shutdown complete")
 }

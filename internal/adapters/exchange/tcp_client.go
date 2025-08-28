@@ -72,9 +72,9 @@ func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, excha
 		default:
 			conn, err := net.Dial("tcp", address)
 			if err != nil {
-				slog.Error("Connection error, retrying...", 
-					"exchange", exchangeName, 
-					"address", address, 
+				slog.Error("Connection error, retrying...",
+					"exchange", exchangeName,
+					"address", address,
 					"error", err)
 				time.Sleep(r.retryDelay)
 				continue
@@ -94,43 +94,43 @@ func (r *ExchangeClient) runTCPClient(ctx context.Context, address string, excha
 }
 
 func (r *ExchangeClient) handleConnection(ctx context.Context, conn net.Conn, exchangeName string, out chan<- domain.PriceTick) error {
-    reader := bufio.NewReader(conn)
+	reader := bufio.NewReader(conn)
 
-    for {
-        select {
-        case <-ctx.Done():
-            slog.Info("Context cancelled, closing connection", "exchange", exchangeName)
-            return nil
-        default:
-        }
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("Context cancelled, closing connection", "exchange", exchangeName)
+			return nil
+		default:
+		}
 
-        _ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-        line, err := reader.ReadBytes('\n')
-        if err != nil {
-            return err
-        }
+		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			return err
+		}
 
-        var raw rawTick
-        if err := json.Unmarshal(line, &raw); err != nil {
-            slog.Error("Unmarshal error", "exchange", exchangeName, "error", err)
-            continue
-        }
- 
-        ts := time.Unix(0, raw.Timestamp*int64(time.Millisecond))
+		var raw rawTick
+		if err := json.Unmarshal(line, &raw); err != nil {
+			slog.Error("Unmarshal error", "exchange", exchangeName, "error", err)
+			continue
+		}
 
-        tick := domain.PriceTick{
-            Exchange: exchangeName,
-            Symbol:   raw.Symbol,
-            Price:    raw.Price,
-            Ts:       ts,
-        }
- 
-        select {
-        case <-ctx.Done():
-            return nil
-        case out <- tick:
-        case <-time.After(100 * time.Millisecond):
-            slog.Warn("Send timeout, dropping message", "exchange", exchangeName)
-        }
-    }
+		ts := time.Unix(0, raw.Timestamp*int64(time.Millisecond))
+
+		tick := domain.PriceTick{
+			Exchange: exchangeName,
+			Symbol:   raw.Symbol,
+			Price:    raw.Price,
+			Ts:       ts,
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case out <- tick:
+		case <-time.After(100 * time.Millisecond):
+			slog.Warn("Send timeout, dropping message", "exchange", exchangeName)
+		}
+	}
 }

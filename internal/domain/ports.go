@@ -17,39 +17,73 @@ type RedisClient interface {
 	StoreTick(ctx context.Context, exchange, pair string, price float64) error
 	ProcessLastMinute(ctx context.Context) []*MinuteAgg
 
-	GetLatestPriceByPattern(ctx context.Context, pattern string) float64
+	// --- latest ---
+	GetLatestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
 
-	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	// --- highest ---
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 
-	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	// --- lowest ---
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 
-	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
-
-	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	// --- average ---
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 }
 
 type Repository interface {
-	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg) error
+	// Infra
 	Ping(ctx context.Context) error
 
-	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
-	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	// Write-side (minute aggregates)
+	StoreMinAgg(ctx context.Context, aggs []*MinuteAgg) error
 
-	GetLowestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
-	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	// -------- HIGHEST --------
+	GetHighestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 
-	GetAvgPriceBySymbol(ctx context.Context, symbol string) float64
-	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
-	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	// -------- LOWEST ---------
+	GetLowestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
+
+	// -------- AVERAGE --------
+	GetAvgPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
+}
+
+type WindowStore interface {
+	// Запись и снапшот
+	Add(msg PriceTick)
+	Snapshot() map[Key][]PriceTick
+
+	// Latest
+	GetLatestPriceBySymbol(symbol string) (float64, error)
+	GetLatestPriceBySymbolAndExchange(symbol, exchange string) (float64, error)
+
+	// Highest
+	GetHighestPriceBySymbolAndPeriod(symbol string, period time.Duration) (float64, error)
+	GetHighestPriceBySymbolAndPeriodAndExchange(symbol, exchange string, period time.Duration) (float64, error)
+
+	// Lowest
+	GetLowestPriceBySymbol(symbol string) (float64, error)
+	GetLowestPriceBySymbolAndExchange(symbol, exchange string) (float64, error)
+	GetLowestPriceBySymbolAndPeriod(symbol string, period time.Duration) (float64, error)
+	GetLowestPriceBySymbolAndPeriodAndExchange(symbol, exchange string, period time.Duration) (float64, error)
+
+	// Average
+	GetAvgPriceBySymbol(symbol string) (float64, error)
+	GetAvgPriceBySymbolAndExchange(symbol, exchange string) (float64, error)
+	GetAvgPriceBySymbolAndPeriod(symbol string, period time.Duration) (float64, error)
+	GetAvgPriceBySymbolAndPeriodAndExchange(symbol, exchange string, period time.Duration) (float64, error)
 }
 
 type DataProcessingService interface {
@@ -64,23 +98,23 @@ type ServerHandler interface {
 }
 
 type MarketDataService interface {
-	GetLatestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
+	GetLatestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
 
-	GetHighestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
-	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	GetHighestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
+	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 
-	GetLowestPriceBySymbol(ctx context.Context, symbol string) float64
-	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
-	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	GetLowestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
+	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 
-	GetAvgPriceBySymbol(ctx context.Context, symbol string) float64
-	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) float64
-	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) float64
-	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) float64
+	GetAvgPriceBySymbol(ctx context.Context, symbol string) (float64, error)
+	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
+	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
+	GetAvgPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
 }
 
 type SystemService interface {
@@ -91,7 +125,7 @@ type SystemService interface {
 	Shutdown(ctx context.Context) error
 	// Health check
 	GetSystemHealth(ctx context.Context) (SystemHealth, error)
-	
+
 	// Dependency status
 	CheckRedisHealth(ctx context.Context) bool
 	CheckPostgresHealth(ctx context.Context) bool
