@@ -100,17 +100,14 @@ type ServerHandler interface {
 type MarketDataService interface {
 	GetLatestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
 	GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
-
 	GetHighestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
 	GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
 	GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
 	GetHighestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
-
 	GetLowestPriceBySymbol(ctx context.Context, symbol string) (float64, error)
 	GetLowestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
 	GetLowestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)
 	GetLowestPriceBySymbolAndPeriodAndExchange(ctx context.Context, symbol, exchange string, period time.Duration) (float64, error)
-
 	GetAvgPriceBySymbol(ctx context.Context, symbol string) (float64, error)
 	GetAvgPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error)
 	GetAvgPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error)

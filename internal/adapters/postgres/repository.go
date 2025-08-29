@@ -71,7 +71,7 @@ func (r *Repository) Ping(ctx context.Context) error {
 
 func (r *Repository) GetHighestPriceBySymbol(ctx context.Context, symbol string) (float64, error) {
 	var price float64
-	
+
 	err := r.db.QueryRowContext(ctx, `
 		SELECT MAX(max_price)
 		FROM minute_prices

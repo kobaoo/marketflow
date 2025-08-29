@@ -5,9 +5,7 @@ import (
 	"fmt"
 )
 
-var (
-	Port int
-)
+var Port int
 
 func ParseFlags() {
 	flag.IntVar(&Port, "port", 0, "Port to serve on")

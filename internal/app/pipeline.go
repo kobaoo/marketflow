@@ -20,8 +20,8 @@ type DataProcessingService struct {
 	breakerMu    sync.Mutex
 	redisBlocked bool
 	unblockAfter time.Time
-	perExChans map[string]chan domain.PriceTick
-	dispCancel context.CancelFunc 
+	perExChans   map[string]chan domain.PriceTick
+	dispCancel   context.CancelFunc
 }
 
 func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository, window domain.WindowStore) domain.DataProcessingService {
@@ -42,7 +42,7 @@ func (d *DataProcessingService) StartWorkersPerExchange(ctx context.Context, in 
 
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancelFunc = cancel
- 
+
 	d.perExChans = make(map[string]chan domain.PriceTick, len(exchanges))
 	for _, ex := range exchanges {
 		d.perExChans[ex] = make(chan domain.PriceTick, 512)
@@ -124,7 +124,6 @@ func (d *DataProcessingService) StopWorkers() {
 		slog.Warn("Timeout waiting data processing workers to stop")
 	}
 }
-
 
 func (d *DataProcessingService) worker(ctx context.Context, in <-chan domain.PriceTick, workerID int) {
 	defer d.wg.Done()
@@ -231,7 +230,7 @@ func (d *DataProcessingService) aggregator(ctx context.Context) {
 			if len(rows) > 0 {
 				if err := d.repository.StoreMinAgg(ctx, rows); err != nil {
 					slog.Error("PG insert failed", "err", err)
-				}else {
+				} else {
 					slog.Info("Aggregation completed successfully!")
 				}
 			}

@@ -49,7 +49,7 @@ func (r *MarketDataService) GetHighestPriceBySymbolAndExchange(ctx context.Conte
 
 func (r *MarketDataService) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error) {
 	symbol = strings.ToUpper(symbol)
-	
+
 	if period <= time.Minute {
 		if price, err := r.redisClient.GetHighestPriceBySymbolAndPeriod(ctx, symbol, period); err == nil {
 			return price, nil

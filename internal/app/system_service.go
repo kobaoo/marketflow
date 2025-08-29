@@ -67,7 +67,6 @@ func (m *ModeServiceImpl) SwitchToTestMode() error {
 	}
 	m.dataProcessor.StartWorkersPerExchange(modeCtx, messages, names)
 
-
 	slog.Info("Successfully switched to test mode")
 	return nil
 }
@@ -96,7 +95,6 @@ func (m *ModeServiceImpl) SwitchToLiveMode() error {
 		names = append(names, ex.Name)
 	}
 	m.dataProcessor.StartWorkersPerExchange(modeCtx, messages, names)
-
 
 	slog.Info("Successfully switched to live mode")
 	return nil

@@ -1,8 +1,9 @@
 package main
 
 import (
-	_ "github.com/lib/pq" // postgres driver
 	"marketflow/cmd"
+
+	_ "github.com/lib/pq" // postgres driver
 )
 
 func main() {
