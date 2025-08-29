@@ -61,7 +61,12 @@ func (m *ModeServiceImpl) SwitchToTestMode() error {
 
 	messages := m.exchangeService.StartTestMode(modeCtx)
 	m.messagesChan = messages
-	m.dataProcessor.StartWorkers(modeCtx, messages)
+	names := make([]string, 0, len(m.config.Exchanges))
+	for _, ex := range m.config.Exchanges {
+		names = append(names, ex.Name)
+	}
+	m.dataProcessor.StartWorkersPerExchange(modeCtx, messages, names)
+
 
 	slog.Info("Successfully switched to test mode")
 	return nil
@@ -86,7 +91,12 @@ func (m *ModeServiceImpl) SwitchToLiveMode() error {
 
 	messages := m.exchangeService.StartLiveMode(modeCtx)
 	m.messagesChan = messages
-	m.dataProcessor.StartWorkers(modeCtx, messages)
+	names := make([]string, 0, len(m.config.Exchanges))
+	for _, ex := range m.config.Exchanges {
+		names = append(names, ex.Name)
+	}
+	m.dataProcessor.StartWorkersPerExchange(modeCtx, messages, names)
+
 
 	slog.Info("Successfully switched to live mode")
 	return nil

@@ -67,7 +67,11 @@ func RunApp() {
 	<-rootCtx.Done()
 	slog.Info("Interrupt received, shutting down...")
 
-	_ = sysService.Shutdown(context.Background())
+	err = sysService.Shutdown(context.Background())
+	if err != nil {
+		slog.Error("Failed to shutdown system service", "err", err)
+		return
+	}
 
 	slog.Info("Shutdown complete")
 }

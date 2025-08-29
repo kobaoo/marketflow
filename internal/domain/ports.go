@@ -87,7 +87,7 @@ type WindowStore interface {
 }
 
 type DataProcessingService interface {
-	StartWorkers(ctx context.Context, in <-chan PriceTick)
+	StartWorkersPerExchange(ctx context.Context, in <-chan PriceTick, exchanges []string)
 	StopWorkers()
 	ExchangesHealth(within time.Duration, names []string) map[string]bool
 }

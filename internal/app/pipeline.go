@@ -20,6 +20,8 @@ type DataProcessingService struct {
 	breakerMu    sync.Mutex
 	redisBlocked bool
 	unblockAfter time.Time
+	perExChans map[string]chan domain.PriceTick
+	dispCancel context.CancelFunc 
 }
 
 func NewDataProcessingService(redisClient domain.RedisClient, repository domain.Repository, window domain.WindowStore) domain.DataProcessingService {
@@ -32,9 +34,81 @@ func NewDataProcessingService(redisClient domain.RedisClient, repository domain.
 	}
 }
 
+func (d *DataProcessingService) StartWorkersPerExchange(ctx context.Context, in <-chan domain.PriceTick, exchanges []string) {
+	if ctx.Err() != nil {
+		slog.Warn("Cannot start workers: context already cancelled")
+		return
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	d.cancelFunc = cancel
+ 
+	d.perExChans = make(map[string]chan domain.PriceTick, len(exchanges))
+	for _, ex := range exchanges {
+		d.perExChans[ex] = make(chan domain.PriceTick, 512)
+	}
+
+	workerID := 0
+	for ex, ch := range d.perExChans {
+		for i := 0; i < 5; i++ {
+			workerID++
+			d.wg.Add(1)
+			go d.worker(ctx, ch, workerID)
+		}
+		slog.Info("Per-exchange workers started", "exchange", ex, "workers", 5)
+	}
+
+	d.wg.Add(1)
+	dispCtx, dispCancel := context.WithCancel(ctx)
+	d.dispCancel = dispCancel
+	go func() {
+		defer d.wg.Done()
+		for {
+			select {
+			case <-dispCtx.Done():
+				slog.Info("dispatcher stopped")
+				return
+			case msg, ok := <-in:
+				if !ok {
+					slog.Info("unified input closed, dispatcher exiting")
+					return
+				}
+				ch, ok := d.perExChans[msg.Exchange]
+				if !ok {
+					slog.Warn("no per-exchange channel", "exchange", msg.Exchange)
+					continue
+				}
+				select {
+				case ch <- msg:
+				case <-dispCtx.Done():
+					return
+				case <-time.After(50 * time.Millisecond):
+					slog.Warn("per-exchange channel full, dropping", "exchange", msg.Exchange, "symbol", msg.Symbol)
+				}
+			}
+		}
+	}()
+
+	d.wg.Add(1)
+	go d.aggregator(ctx)
+
+	slog.Info("Started per-exchange workers with dispatcher", "exchanges", len(exchanges), "total_workers", workerID)
+}
+
 func (d *DataProcessingService) StopWorkers() {
+	if d.dispCancel != nil {
+		d.dispCancel()
+		d.dispCancel = nil
+	}
+
 	if d.cancelFunc != nil {
 		d.cancelFunc()
+		d.cancelFunc = nil
+	}
+
+	for ex, ch := range d.perExChans {
+		close(ch)
+		delete(d.perExChans, ex)
 	}
 
 	done := make(chan struct{})
@@ -51,25 +125,7 @@ func (d *DataProcessingService) StopWorkers() {
 	}
 }
 
-func (d *DataProcessingService) StartWorkers(ctx context.Context, in <-chan domain.PriceTick) {
-	if ctx.Err() != nil {
-		slog.Warn("Cannot start workers: context already cancelled")
-		return
-	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	d.cancelFunc = cancel
-
-	for i := 1; i <= 15; i++ {
-		d.wg.Add(1)
-		go d.worker(ctx, in, i)
-	}
-
-	d.wg.Add(1)
-	go d.aggregator(ctx)
-
-	slog.Info("Started data processing workers", "count", 15)
-}
 func (d *DataProcessingService) worker(ctx context.Context, in <-chan domain.PriceTick, workerID int) {
 	defer d.wg.Done()
 	slog.Info("Worker started", "worker", workerID)
@@ -175,6 +231,8 @@ func (d *DataProcessingService) aggregator(ctx context.Context) {
 			if len(rows) > 0 {
 				if err := d.repository.StoreMinAgg(ctx, rows); err != nil {
 					slog.Error("PG insert failed", "err", err)
+				}else {
+					slog.Info("Aggregation completed successfully!")
 				}
 			}
 		}
