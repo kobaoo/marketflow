@@ -13,4 +13,4 @@ RUN go build -o marketflow .
 
 EXPOSE 8400
 
-CMD ["./marketflow"]
+CMD ["sh", "-c", "sleep 5 && ./marketflow"]

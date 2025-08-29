@@ -28,6 +28,7 @@ func (r *MarketDataService) GetLatestPriceBySymbol(ctx context.Context, symbol s
 	}
 	return r.windowStore.GetLatestPriceBySymbol(symbol)
 }
+
 func (r *MarketDataService) GetLatestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error) {
 	symbol = strings.ToUpper(symbol)
 	if price, err := r.redisClient.GetLatestPriceBySymbolAndExchange(ctx, symbol, exchange); err == nil {
@@ -37,12 +38,18 @@ func (r *MarketDataService) GetLatestPriceBySymbolAndExchange(ctx context.Contex
 }
 
 func (r *MarketDataService) GetHighestPriceBySymbol(ctx context.Context, symbol string) (float64, error) {
+	symbol = strings.ToUpper(symbol)
 	return r.repository.GetHighestPriceBySymbol(ctx, symbol)
 }
+
 func (r *MarketDataService) GetHighestPriceBySymbolAndExchange(ctx context.Context, symbol, exchange string) (float64, error) {
+	symbol = strings.ToUpper(symbol)
 	return r.repository.GetHighestPriceBySymbolAndExchange(ctx, symbol, exchange)
 }
+
 func (r *MarketDataService) GetHighestPriceBySymbolAndPeriod(ctx context.Context, symbol string, period time.Duration) (float64, error) {
+	symbol = strings.ToUpper(symbol)
+	
 	if period <= time.Minute {
 		if price, err := r.redisClient.GetHighestPriceBySymbolAndPeriod(ctx, symbol, period); err == nil {
 			return price, nil
